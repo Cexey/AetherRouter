@@ -1,0 +1,6 @@
+{
+  "name": "AetherRouter",
+  "description": "Customizable offline-first Android client for OpenRouter with live web search, encrypted local Room storage, rich media/document uploads, SillyTavern cards, MCP tools, voice mode, and Material 3 Expressive customization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

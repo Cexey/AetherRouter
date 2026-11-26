@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">AetherRouter</string>
+    <string name="tagline">Private OpenRouter Studio</string>
+    <string name="action_new_chat">New chat</string>
+    <string name="action_send">Send message</string>
+    <string name="action_stop">Stop streaming</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_share">Share</string>
+    <string name="action_regenerate">Regenerate</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_select_model">Select model</string>
+    <string name="action_open_drawer">Open conversations</string>
+    <string name="action_api_settings">API &amp; Web settings</string>
+    <string name="label_model_thinking">Model Thinking</string>
+    <string name="label_live_sources">Live Sources</string>
+    <string name="label_web_agentic">Web: Agentic</string>
+    <string name="label_web_always_on">Web: Always-On</string>
+    <string name="label_web_off">Web: Off</string>
+    <string name="composer_placeholder">Message AetherRouter…</string>
+    <string name="api_key_missing_hint">Add your OpenRouter API key to start chatting</string>
+</resources>
