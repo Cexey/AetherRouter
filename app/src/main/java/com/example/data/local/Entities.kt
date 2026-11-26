@@ -24,6 +24,10 @@ data class ConversationEntity(
     val folderId: String? = null,
     val personaId: String? = null,
     val enabledMcpServerIdsJson: String = "",
+    val fallbackModelIdsJson: String = "",
+    val enabledLorebookIdsJson: String = "",
+    val contextSummary: String = "", // Encrypted rolling memory summary
+    val summarizedUpToTimestamp: Long = 0L,
     val title: String, // Encrypted via CryptoManager
     val modelId: String,
     val systemPromptOverride: String = "", // Encrypted via CryptoManager
@@ -70,6 +74,8 @@ data class MessageEntity(
     val completionTokens: Int = 0,
     val toolCallsJson: String = "", // Encrypted tool calls payload
     val toolCallId: String = "",
+    val swipesJson: String = "", // Encrypted JSON array of MessageSwipe variants
+    val activeSwipeIndex: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
 )
 
@@ -125,4 +131,34 @@ data class McpServerEntity(
     val isEnabled: Boolean = true,
     val toolsJson: String = "", // JSON array of discovered McpToolDef
     val lastSyncedAt: Long = 0L,
+)
+
+@Entity(tableName = "global_lorebooks")
+data class GlobalLorebookEntity(
+    @PrimaryKey val id: String,
+    val name: String, // Encrypted via CryptoManager
+    val description: String = "", // Encrypted via CryptoManager
+    val entriesJson: String = "", // Encrypted JSON array of LorebookEntry
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "sampler_presets")
+data class SamplerPresetEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val temperature: Float = 0.7f,
+    val topP: Float = 1.0f,
+    val maxTokens: Int = 4096,
+    val reasoningEffort: String = "medium",
+    val systemPromptSnippet: String = "", // Encrypted via CryptoManager
+    val isBuiltIn: Boolean = false,
+)
+
+@Entity(tableName = "slash_prompt_templates")
+data class SlashPromptTemplateEntity(
+    @PrimaryKey val id: String,
+    val command: String,
+    val title: String,
+    val promptBody: String, // Encrypted via CryptoManager
+    val updatedAt: Long = System.currentTimeMillis(),
 )

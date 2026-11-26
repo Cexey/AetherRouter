@@ -5,6 +5,9 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.core.CodeArtifactUtils
+import com.example.core.ContextAndCostEstimator
+import com.example.core.ContextCostMetrics
 import com.example.core.DocumentExtractor
 import com.example.core.ExportManager
 import com.example.core.LiveClockProvider
@@ -24,22 +27,38 @@ import com.example.data.model.CreatorProfile
 import com.example.data.model.CustomSticker
 import com.example.data.model.ExportFormat
 import com.example.data.model.Folder
+import com.example.data.model.GitHubContentEntry
+import com.example.data.model.GitHubPendingPush
+import com.example.data.model.GitHubRepoSummary
+import com.example.data.model.GlobalLorebook
 import com.example.data.model.LinkOpenBehavior
+import com.example.data.model.LiveArtifactPreviewRequest
 import com.example.data.model.McpServerConfig
 import com.example.data.model.McpToolDef
+import com.example.data.model.MessageSwipe
 import com.example.data.model.ModelInfo
+import com.example.data.model.OpenRouterActivityBreakdown
+import com.example.data.model.OpenRouterAlertState
+import com.example.data.model.OpenRouterCreditBalance
+import com.example.data.model.OpenRouterUsageSnapshot
 import com.example.data.model.PersonaCard
 import com.example.data.model.ReasoningEffort
+import com.example.data.model.SamplerPreset
+import com.example.data.model.SlashPromptTemplate
 import com.example.data.model.ThemeMode
 import com.example.data.model.UrlCitation
 import com.example.data.model.WebSearchEngine
 import com.example.data.model.WebSearchMode
+import com.example.data.repository.UsageRepository
 import com.example.data.repository.VaultRepository
+import com.example.network.GitHubRepository
 import com.example.network.LiveWebFetcher
 import com.example.network.McpJsonRpcClient
+import com.example.network.OpenRouterApiException
 import com.example.network.OpenRouterStreamClient
 import com.example.network.OpenRouterStreamEvent
 import com.example.network.ToolCallPayload
+import com.example.ui.components.GitHubStudioUiState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +87,29 @@ data class StreamingUiState(
     val modelId: String = "",
 )
 
+data class CompareLaneState(
+    val modelId: String = "",
+    val content: String = "",
+    val reasoningText: String = "",
+    val reasoningDetailsJson: String = "",
+    val citations: List<UrlCitation> = emptyList(),
+    val isStreaming: Boolean = false,
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
+    val elapsedMs: Long = 0L,
+    val error: String? = null,
+)
+
+data class ModelCompareUiState(
+    val prompt: String = "",
+    val modelBId: String = "",
+    val laneA: CompareLaneState = CompareLaneState(),
+    val laneB: CompareLaneState = CompareLaneState(),
+) {
+    val isRunning: Boolean
+        get() = laneA.isStreaming || laneB.isStreaming
+}
+
 data class ChatWorkspaceUiState(
     val preferences: AppPreferences = AppPreferences(),
     val clock: LiveClockSnapshot = LiveClockProvider.captureSnapshot(),
@@ -77,6 +119,7 @@ data class ChatWorkspaceUiState(
     val drawerSearchQuery: String = "",
     val activeConversation: Conversation? = null,
     val activeModel: ModelInfo? = null,
+    val allModels: List<ModelInfo> = emptyList(),
     val messages: List<ChatMessage> = emptyList(),
     val streaming: StreamingUiState = StreamingUiState(),
     val composerText: String = "",
@@ -93,6 +136,21 @@ data class ChatWorkspaceUiState(
     val isSyncingMcpServerId: String? = null,
     val voiceState: VoiceUiState = VoiceUiState(),
     val smartReplies: List<String> = emptyList(),
+    val contextCostMetrics: ContextCostMetrics = ContextCostMetrics(),
+    val creditBalance: OpenRouterCreditBalance? = null,
+    val isLoadingCredits: Boolean = false,
+    val globalLorebooks: List<GlobalLorebook> = emptyList(),
+    val samplerPresets: List<SamplerPreset> = emptyList(),
+    val slashTemplates: List<SlashPromptTemplate> = emptyList(),
+    val isCompressingContext: Boolean = false,
+    val compareState: ModelCompareUiState = ModelCompareUiState(),
+    val lastMatchedLorebookCount: Int = 0,
+    val usageSnapshot: OpenRouterUsageSnapshot? = null,
+    val activityBreakdown: OpenRouterActivityBreakdown? = null,
+    val isLoadingActivity: Boolean = false,
+    val openRouterAlert: OpenRouterAlertState? = null,
+    val liveArtifactPreview: LiveArtifactPreviewRequest? = null,
+    val gitHubState: GitHubStudioUiState = GitHubStudioUiState(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -107,6 +165,8 @@ class ChatViewModel(
     private val personaCardEngine: PersonaCardEngine,
     private val mcpClient: McpJsonRpcClient,
     private val voiceEngineManager: VoiceEngineManager,
+    private val usageRepository: UsageRepository,
+    private val gitHubRepository: GitHubRepository,
 ) : ViewModel() {
 
     private val activeConversationId = MutableStateFlow<String?>(null)
@@ -122,8 +182,19 @@ class ChatViewModel(
     private val snackbarMessage = MutableStateFlow<String?>(null)
     private val inAppBrowserUrl = MutableStateFlow<String?>(null)
     private val pendingLinkChoiceUrl = MutableStateFlow<String?>(null)
+    private val creditBalance = MutableStateFlow<OpenRouterCreditBalance?>(null)
+    private val isLoadingCredits = MutableStateFlow(false)
+    private val isLoadingActivity = MutableStateFlow(false)
+    private val openRouterAlert = MutableStateFlow<OpenRouterAlertState?>(null)
+    private val liveArtifactPreview = MutableStateFlow<LiveArtifactPreviewRequest?>(null)
+    private val gitHubState = MutableStateFlow(GitHubStudioUiState())
+    private val isCompressingContext = MutableStateFlow(false)
+    private val compareState = MutableStateFlow(ModelCompareUiState())
+    private val lastMatchedLorebookCount = MutableStateFlow(0)
 
     private var activeStreamJob: Job? = null
+    private var compareJobA: Job? = null
+    private var compareJobB: Job? = null
     private var searchJob: Job? = null
     private var autoSpeakNextResponse: Boolean = false
 
@@ -156,9 +227,7 @@ class ChatViewModel(
         activeConversationFlow,
         vaultRepository.observeModels(),
     ) { prefs, clock, convs, activeConv, models ->
-        val modelId = activeConv?.modelId ?: prefs.defaultModelId
-        val activeModel = models.firstOrNull { it.id == modelId }
-        Tuple5(prefs, clock, convs, activeConv, activeModel)
+        Tuple5(prefs, clock, convs, activeConv, models)
     }
 
     private val interactionFlow = combine(
@@ -185,8 +254,30 @@ class ChatViewModel(
         snackbarMessage,
         inAppBrowserUrl,
         pendingLinkChoiceUrl,
-    ) { snack, browserUrl, choiceUrl ->
-        Triple(snack, browserUrl, choiceUrl)
+        isCompressingContext,
+        compareState,
+    ) { snack, browserUrl, choiceUrl, compressing, compare ->
+        Tuple5(snack, browserUrl, choiceUrl, compressing, compare)
+    }
+
+    private val extrasFlow = combine(
+        vaultRepository.observeGlobalLorebooks(),
+        vaultRepository.observeSamplerPresets(),
+        vaultRepository.observeSlashTemplates(),
+        creditBalance,
+        isLoadingCredits,
+    ) { lorebooks, presets, templates, credits, loadingCredits ->
+        Tuple5(lorebooks, presets, templates, credits, loadingCredits)
+    }
+
+    private val phase4UsageFlow = combine(
+        usageRepository.usageSnapshot,
+        usageRepository.activityBreakdown,
+        isLoadingActivity,
+        openRouterAlert,
+        combine(liveArtifactPreview, gitHubState) { preview, gh -> preview to gh },
+    ) { usageSnap, activity, loadingAct, alert, previewAndGh ->
+        Tuple5(usageSnap, activity, loadingAct, alert, previewAndGh)
     }
 
     private val powerToolsFlow = combine(
@@ -194,8 +285,11 @@ class ChatViewModel(
         vaultRepository.observeMcpServers(),
         isSyncingMcpServerId,
         voiceEngineManager.state,
-    ) { personas, mcpServers, syncingId, voice ->
-        Tuple4(personas, mcpServers, syncingId, voice)
+        combine(extrasFlow, lastMatchedLorebookCount, phase4UsageFlow) { ext, loreCount, p4 ->
+            Triple(ext, loreCount, p4)
+        },
+    ) { personas, mcpServers, syncingId, voice, extTriple ->
+        Tuple5(personas, mcpServers, syncingId, voice, extTriple)
     }
 
     val uiState: StateFlow<ChatWorkspaceUiState> = combine(
@@ -207,14 +301,38 @@ class ChatViewModel(
     ) { base, interaction, mediaFolder, overlay, power ->
         val prefs = base.a
         val activeConv = base.d
+        val allModels = base.e
+        val modelId = activeConv?.modelId ?: prefs.defaultModelId
+        val modelById = allModels.associateBy { it.id }
+        val activeModel = modelById[modelId]
         val msgs = interaction.a
         val stream = interaction.b
         val activePersona = activeConv?.personaId?.let { pid -> power.a.firstOrNull { it.id == pid } }
+        val (extras, matchedLoreCount, p4) = power.e
+        val enabledLorebooks = if (activeConv != null && activeConv.enabledLorebookIds.isNotEmpty()) {
+            extras.a.filter { it.id in activeConv.enabledLorebookIds }
+        } else {
+            emptyList()
+        }
+        val projectInstructions = activeConv?.folderId?.let { fid ->
+            mediaFolder.a.firstOrNull { it.id == fid }?.projectInstructions.orEmpty()
+        }.orEmpty()
+        val metrics = ContextAndCostEstimator.computeConversationMetrics(
+            conversation = activeConv,
+            messages = msgs,
+            stagedAttachments = mediaFolder.c,
+            activeModel = activeModel,
+            modelById = modelById,
+            activePersona = activePersona,
+            activeGlobalLorebooks = enabledLorebooks,
+            projectInstructions = projectInstructions,
+        )
         val smartReplies = if (prefs.smartRepliesEnabled && !stream.isStreaming) {
             SmartReplyGenerator.generateSuggestions(msgs)
         } else {
             emptyList()
         }
+        val (artifactPreview, ghUi) = p4.e
         ChatWorkspaceUiState(
             preferences = prefs,
             clock = base.b,
@@ -223,7 +341,8 @@ class ChatViewModel(
             conversations = base.c,
             drawerSearchQuery = interaction.d,
             activeConversation = activeConv,
-            activeModel = base.e,
+            activeModel = activeModel,
+            allModels = allModels,
             messages = msgs,
             streaming = stream,
             composerText = interaction.c,
@@ -231,15 +350,30 @@ class ChatViewModel(
             customStickers = mediaFolder.d,
             isProcessingAttachment = mediaFolder.e,
             isFetchingWebpage = interaction.e,
-            snackbarMessage = overlay.first,
-            inAppBrowserUrl = overlay.second,
-            pendingLinkChoiceUrl = overlay.third,
+            snackbarMessage = overlay.a,
+            inAppBrowserUrl = overlay.b,
+            pendingLinkChoiceUrl = overlay.c,
             personas = power.a,
             activePersona = activePersona,
             mcpServers = power.b,
             isSyncingMcpServerId = power.c,
             voiceState = power.d,
             smartReplies = smartReplies,
+            contextCostMetrics = metrics,
+            creditBalance = extras.d ?: p4.a?.toLegacyCreditBalance(),
+            isLoadingCredits = extras.e,
+            globalLorebooks = extras.a,
+            samplerPresets = extras.b,
+            slashTemplates = extras.c,
+            isCompressingContext = overlay.d,
+            compareState = overlay.e,
+            lastMatchedLorebookCount = matchedLoreCount,
+            usageSnapshot = p4.a,
+            activityBreakdown = p4.b,
+            isLoadingActivity = p4.c,
+            openRouterAlert = p4.d,
+            liveArtifactPreview = artifactPreview,
+            gitHubState = ghUi,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -250,9 +384,18 @@ class ChatViewModel(
     init {
         viewModelScope.launch {
             vaultRepository.ensureStarterModelsSeeded()
+            vaultRepository.ensureStarterPresetsSeeded()
             val existing = vaultRepository.observeConversations().first()
             if (existing.isNotEmpty() && activeConversationId.value == null) {
                 activeConversationId.value = existing.first().id
+            }
+            val savedKey = preferencesRepository.getDecryptedApiKey()
+            if (savedKey.isNotBlank()) {
+                refreshCreditBalance(silent = true)
+            }
+            val savedMgmt = preferencesRepository.getDecryptedManagementApiKey()
+            if (savedMgmt.isNotBlank()) {
+                refreshActivityBreakdown(silent = true)
             }
         }
     }
@@ -357,6 +500,7 @@ class ChatViewModel(
         webSearchEngine: WebSearchEngine,
         webMaxResults: Int,
         webMaxTotalResults: Int,
+        fallbackModelIds: List<String> = emptyList(),
     ) {
         viewModelScope.launch {
             val current = ensureActiveConversation()
@@ -372,6 +516,7 @@ class ChatViewModel(
                     webSearchEngine = webSearchEngine,
                     webMaxResults = webMaxResults.coerceIn(1, 10),
                     webMaxTotalResults = webMaxTotalResults.coerceIn(5, 30),
+                    fallbackModelIds = fallbackModelIds.filter { it.isNotBlank() && it != current.modelId }.distinct().take(4),
                 ),
             )
             preferencesRepository.setDefaultWebConfig(
@@ -381,7 +526,7 @@ class ChatViewModel(
                 maxResults = webMaxResults,
                 maxTotalResults = webMaxTotalResults,
             )
-            showSnackbar("Chat & Web settings saved")
+            showSnackbar("Chat, Fallback & Web settings saved")
         }
     }
 
@@ -433,8 +578,57 @@ class ChatViewModel(
                 return@launch
             }
             val conv = vaultRepository.getConversation(message.conversationId) ?: return@launch
-            vaultRepository.deleteMessagesAfter(conv.id, message.createdAt - 1L)
-            launchCompletionStream(apiKey = apiKey, conversation = conv)
+            // Keep this message in place so previous regenerations remain swipeable (< 1 / N >),
+            // and prune any later turns that depended on the old branch.
+            vaultRepository.deleteMessagesAfter(conv.id, message.createdAt)
+            launchCompletionStream(
+                apiKey = apiKey,
+                conversation = conv,
+                replaceSwipeTargetMessage = message,
+            )
+        }
+    }
+
+    fun selectMessageSwipe(message: ChatMessage, newIndex: Int) {
+        if (message.swipes.isEmpty() || newIndex !in message.swipes.indices) return
+        val chosen = message.swipes[newIndex]
+        viewModelScope.launch {
+            vaultRepository.saveMessage(
+                message.copy(
+                    content = chosen.content,
+                    reasoningContent = chosen.reasoningContent,
+                    reasoningDetailsJson = chosen.reasoningDetailsJson,
+                    thinkingDurationMs = chosen.thinkingDurationMs,
+                    citations = chosen.citations,
+                    modelUsed = chosen.modelUsed.ifBlank { message.modelUsed },
+                    promptTokens = chosen.promptTokens,
+                    completionTokens = chosen.completionTokens,
+                    activeSwipeIndex = newIndex,
+                ),
+            )
+        }
+    }
+
+    fun forkConversationAtMessage(message: ChatMessage) {
+        if (streamingState.value.isStreaming) stopStreaming()
+        viewModelScope.launch {
+            val conv = vaultRepository.getConversation(message.conversationId) ?: return@launch
+            val forked = vaultRepository.forkConversationAtMessage(conv, message)
+            activeConversationId.value = forked.id
+            showSnackbar("Branched chat: ${forked.title}")
+        }
+    }
+
+    fun clearActiveConversationMessages() {
+        if (streamingState.value.isStreaming) stopStreaming()
+        viewModelScope.launch {
+            val conv = activeConversationId.value?.let { vaultRepository.getConversation(it) } ?: return@launch
+            vaultRepository.clearConversationMessages(conv.id)
+            vaultRepository.updateConversation(
+                conv.copy(contextSummary = "", summarizedUpToTimestamp = 0L),
+            )
+            lastMatchedLorebookCount.value = 0
+            showSnackbar("Cleared conversation messages")
         }
     }
 
@@ -496,6 +690,7 @@ class ChatViewModel(
         apiKey: String,
         conversation: Conversation,
         maxToolDepth: Int = 3,
+        replaceSwipeTargetMessage: ChatMessage? = null,
     ) {
         activeStreamJob?.cancel()
         activeStreamJob = viewModelScope.launch {
@@ -522,6 +717,13 @@ class ChatViewModel(
             }.orEmpty()
 
             val activePersona = conversation.personaId?.let { vaultRepository.getPersonaById(it) }
+            val extraLoreEntries = if (conversation.enabledLorebookIds.isNotEmpty()) {
+                vaultRepository.getGlobalLorebooksOnce()
+                    .filter { it.id in conversation.enabledLorebookIds }
+                    .flatMap { it.entries }
+            } else {
+                emptyList()
+            }
             val enabledServers = vaultRepository.getMcpServersOnce()
                 .filter { it.isEnabled && it.id in conversation.enabledMcpServerIds && it.tools.isNotEmpty() }
             val mcpToolLookup = LinkedHashMap<String, Pair<McpServerConfig, McpToolDef>>()
@@ -538,15 +740,26 @@ class ChatViewModel(
             try {
                 var depth = 0
                 while (depth <= maxToolDepth) {
-                    val history = vaultRepository.getMessagesOnce(conversation.id)
-                    val resolvedPersona = activePersona?.let { persona ->
+                    val rawHistory = vaultRepository.getMessagesOnce(conversation.id)
+                    val history = if (replaceSwipeTargetMessage != null) {
+                        rawHistory.filterNot { it.id == replaceSwipeTargetMessage.id }
+                    } else {
+                        rawHistory
+                    }
+                    val resolvedPersona = if (activePersona != null || extraLoreEntries.isNotEmpty()) {
                         personaCardEngine.buildResolvedPrompt(
-                            persona = persona,
+                            persona = activePersona,
                             history = history,
                             userDisplayName = prefs.creatorProfile.displayName,
                             clockSnapshot = clockSnapshot,
                             use24HourClock = prefs.use24HourClock,
-                        )
+                            extraLorebookEntries = extraLoreEntries,
+                        ).also {
+                            lastMatchedLorebookCount.value = it.matchedLorebookCount
+                        }
+                    } else {
+                        lastMatchedLorebookCount.value = 0
+                        null
                     }
                     var pendingToolCalls: Pair<List<ToolCallPayload>, String>? = null
                     var finalResult: OpenRouterStreamEvent.Completed? = null
@@ -672,17 +885,15 @@ class ChatViewModel(
                                 (System.currentTimeMillis() - streamingState.value.thinkingStartedAtMs).coerceAtLeast(100L)
                             } else 0L
 
-                        val savedAssistant = ChatMessage(
-                            id = UUID.randomUUID().toString(),
-                            conversationId = conversation.id,
-                            role = "assistant",
-                            content = completed.fullContent.ifBlank {
-                                if (completed.fullReasoning.isNotBlank() || completed.reasoningDetailsJson.isNotBlank()) {
-                                    "(Model returned reasoning without final text)"
-                                } else {
-                                    "(Empty response)"
-                                }
-                            },
+                        val finalContent = completed.fullContent.ifBlank {
+                            if (completed.fullReasoning.isNotBlank() || completed.reasoningDetailsJson.isNotBlank()) {
+                                "(Model returned reasoning without final text)"
+                            } else {
+                                "(Empty response)"
+                            }
+                        }
+                        val newSwipe = MessageSwipe(
+                            content = finalContent,
                             reasoningContent = completed.fullReasoning,
                             reasoningDetailsJson = completed.reasoningDetailsJson,
                             thinkingDurationMs = duration,
@@ -692,7 +903,58 @@ class ChatViewModel(
                             completionTokens = completed.completionTokens,
                             createdAt = System.currentTimeMillis(),
                         )
+
+                        val savedAssistant = if (replaceSwipeTargetMessage != null) {
+                            val existingSwipes = replaceSwipeTargetMessage.swipes.ifEmpty {
+                                listOf(
+                                    MessageSwipe(
+                                        content = replaceSwipeTargetMessage.content,
+                                        reasoningContent = replaceSwipeTargetMessage.reasoningContent,
+                                        reasoningDetailsJson = replaceSwipeTargetMessage.reasoningDetailsJson,
+                                        thinkingDurationMs = replaceSwipeTargetMessage.thinkingDurationMs,
+                                        citations = replaceSwipeTargetMessage.citations,
+                                        modelUsed = replaceSwipeTargetMessage.modelUsed,
+                                        promptTokens = replaceSwipeTargetMessage.promptTokens,
+                                        completionTokens = replaceSwipeTargetMessage.completionTokens,
+                                        createdAt = replaceSwipeTargetMessage.createdAt,
+                                    ),
+                                )
+                            }
+                            val nextSwipes = existingSwipes + newSwipe
+                            replaceSwipeTargetMessage.copy(
+                                content = newSwipe.content,
+                                reasoningContent = newSwipe.reasoningContent,
+                                reasoningDetailsJson = newSwipe.reasoningDetailsJson,
+                                thinkingDurationMs = newSwipe.thinkingDurationMs,
+                                citations = newSwipe.citations,
+                                modelUsed = newSwipe.modelUsed,
+                                promptTokens = newSwipe.promptTokens,
+                                completionTokens = newSwipe.completionTokens,
+                                swipes = nextSwipes,
+                                activeSwipeIndex = nextSwipes.lastIndex,
+                            )
+                        } else {
+                            ChatMessage(
+                                id = UUID.randomUUID().toString(),
+                                conversationId = conversation.id,
+                                role = "assistant",
+                                content = newSwipe.content,
+                                reasoningContent = newSwipe.reasoningContent,
+                                reasoningDetailsJson = newSwipe.reasoningDetailsJson,
+                                thinkingDurationMs = newSwipe.thinkingDurationMs,
+                                citations = newSwipe.citations,
+                                modelUsed = newSwipe.modelUsed,
+                                promptTokens = newSwipe.promptTokens,
+                                completionTokens = newSwipe.completionTokens,
+                                swipes = listOf(newSwipe),
+                                activeSwipeIndex = 0,
+                                createdAt = System.currentTimeMillis(),
+                            )
+                        }
                         vaultRepository.saveMessage(savedAssistant)
+                        openRouterAlert.value = null
+                        // Confirmed cadence: auto-refresh live OpenRouter spend & credits after every completed reply
+                        viewModelScope.launch { refreshCreditBalance(silent = true) }
                         if (autoSpeakNextResponse) {
                             autoSpeakNextResponse = false
                             voiceEngineManager.speakText(savedAssistant.id, savedAssistant.content)
@@ -702,6 +964,14 @@ class ChatViewModel(
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
+            } catch (e: OpenRouterApiException) {
+                autoSpeakNextResponse = false
+                if (e.alert != null) {
+                    openRouterAlert.value = e.alert
+                    showSnackbar(e.alert.headline)
+                } else {
+                    showSnackbar(e.message)
+                }
             } catch (e: Exception) {
                 autoSpeakNextResponse = false
                 showSnackbar(e.message ?: "Request failed")
@@ -956,15 +1226,425 @@ class ChatViewModel(
             preferencesRepository.saveApiKey(rawKey)
             val trimmed = rawKey.trim()
             if (trimmed.isEmpty()) {
+                creditBalance.value = null
+                usageRepository.clearMemoryCache()
                 showSnackbar("API key cleared from encrypted vault")
                 return@launch
             }
             showSnackbar("API key encrypted in Android Keystore. Syncing models…")
+            launch { refreshCreditBalance(silent = true) }
             vaultRepository.refreshModelsFromOpenRouter(trimmed).fold(
                 onSuccess = { count -> showSnackbar("Connected! Synced $count OpenRouter models") },
                 onFailure = { err -> showSnackbar("Key saved; catalog sync failed: ${err.message}") },
             )
         }
+    }
+
+    fun refreshCreditBalance(silent: Boolean = false) {
+        viewModelScope.launch {
+            val apiKey = preferencesRepository.getDecryptedApiKey()
+            if (apiKey.isBlank()) {
+                creditBalance.value = null
+                usageRepository.clearMemoryCache()
+                if (!silent) showSnackbar("Add your OpenRouter API key first")
+                return@launch
+            }
+            isLoadingCredits.value = true
+            usageRepository.refreshUsage(apiKey).fold(
+                onSuccess = { snapshot ->
+                    creditBalance.value = snapshot.toLegacyCreditBalance()
+                    if (!silent) showSnackbar("Updated OpenRouter spend & credits")
+                },
+                onFailure = { err ->
+                    if (err is OpenRouterApiException && err.alert != null) {
+                        openRouterAlert.value = err.alert
+                    }
+                    if (!silent) showSnackbar(err.message ?: "Could not fetch OpenRouter usage")
+                },
+            )
+            isLoadingCredits.value = false
+        }
+    }
+
+    fun refreshUsageAndActivity(silent: Boolean = false) {
+        refreshCreditBalance(silent = silent)
+        viewModelScope.launch {
+            val mgmtKey = preferencesRepository.getDecryptedManagementApiKey()
+            if (mgmtKey.isNotBlank()) {
+                refreshActivityBreakdown(silent = silent)
+            }
+        }
+    }
+
+    fun refreshActivityBreakdown(silent: Boolean = false) {
+        viewModelScope.launch {
+            val mgmtKey = preferencesRepository.getDecryptedManagementApiKey()
+            if (mgmtKey.isBlank()) {
+                if (!silent) showSnackbar("Add your OpenRouter Management API key in Settings first")
+                return@launch
+            }
+            isLoadingActivity.value = true
+            usageRepository.refreshActivity(mgmtKey).fold(
+                onSuccess = { breakdown ->
+                    if (!silent) showSnackbar("Loaded ${breakdown.items.size} activity records (30d)")
+                },
+                onFailure = { err ->
+                    if (err is OpenRouterApiException && err.alert != null) {
+                        openRouterAlert.value = err.alert
+                    }
+                    if (!silent) showSnackbar(err.message ?: "Could not load 30-day activity")
+                },
+            )
+            isLoadingActivity.value = false
+        }
+    }
+
+    fun saveManagementApiKeyAndSync(rawKey: String) {
+        viewModelScope.launch {
+            preferencesRepository.saveManagementApiKey(rawKey)
+            if (rawKey.trim().isEmpty()) {
+                usageRepository.clearMemoryCache()
+                launch { refreshCreditBalance(silent = true) }
+                showSnackbar("Management API key cleared")
+                return@launch
+            }
+            showSnackbar("Management key encrypted in Android Keystore. Loading 30d activity…")
+            refreshActivityBreakdown(silent = false)
+        }
+    }
+
+    fun dismissOpenRouterAlert() {
+        openRouterAlert.value = null
+    }
+
+    // --- Phase 4: Live HTML/CSS/JS Artifact Preview & Code File Export ---
+
+    fun openLiveArtifactPreview(language: String, code: String) {
+        val spec = CodeArtifactUtils.buildCodeExportSpec(language, code, baseName = "artifact")
+        liveArtifactPreview.value = LiveArtifactPreviewRequest(
+            language = language,
+            code = code,
+            suggestedFileName = spec.suggestedFileName,
+        )
+    }
+
+    fun dismissLiveArtifactPreview() {
+        liveArtifactPreview.value = null
+    }
+
+    // --- Phase 4: GitHub Repo Connector & Commit Studio ---
+
+    fun saveGitHubPatAndConnect(rawToken: String) {
+        viewModelScope.launch {
+            preferencesRepository.saveGitHubPat(rawToken)
+            val trimmed = rawToken.trim()
+            if (trimmed.isEmpty()) {
+                gitHubRepository.clearMemoryCache()
+                gitHubState.value = GitHubStudioUiState()
+                showSnackbar("GitHub PAT cleared from encrypted vault")
+                return@launch
+            }
+            gitHubState.value = gitHubState.value.copy(isLoading = true, errorMessage = null)
+            gitHubRepository.verifyToken(trimmed).fold(
+                onSuccess = { login ->
+                    gitHubState.value = gitHubState.value.copy(
+                        authenticatedUser = login,
+                        isLoading = false,
+                        errorMessage = null,
+                    )
+                    showSnackbar("GitHub connected as @$login")
+                    refreshGitHubRepos()
+                },
+                onFailure = { err ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isLoading = false,
+                        errorMessage = err.message ?: "GitHub token verification failed",
+                    )
+                    showSnackbar(err.message ?: "GitHub token verification failed")
+                },
+            )
+        }
+    }
+
+    fun startGitHubPushForCode(language: String, code: String) {
+        val spec = CodeArtifactUtils.buildCodeExportSpec(language, code, baseName = "snippet")
+        gitHubState.value = gitHubState.value.copy(
+            pendingPush = GitHubPendingPush(
+                code = code,
+                language = language,
+                suggestedFileName = spec.suggestedFileName,
+            ),
+            commitPreview = null,
+            lastCommitResult = null,
+            errorMessage = null,
+        )
+    }
+
+    fun clearGitHubPendingPush() {
+        gitHubState.value = gitHubState.value.copy(
+            pendingPush = null,
+            commitPreview = null,
+        )
+    }
+
+    fun clearGitHubCommitPreview() {
+        gitHubState.value = gitHubState.value.copy(commitPreview = null)
+    }
+
+    fun refreshGitHubRepos() {
+        viewModelScope.launch {
+            val pat = preferencesRepository.getDecryptedGitHubPat()
+            if (pat.isBlank()) {
+                gitHubState.value = GitHubStudioUiState(errorMessage = "Add a GitHub Personal Access Token in Settings")
+                return@launch
+            }
+            gitHubState.value = gitHubState.value.copy(isLoading = true, errorMessage = null)
+            val login = gitHubState.value.authenticatedUser ?: gitHubRepository.verifyToken(pat).getOrNull()
+            gitHubRepository.listRepositories(pat).fold(
+                onSuccess = { repos ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isLoading = false,
+                        authenticatedUser = login,
+                        repos = repos,
+                        errorMessage = null,
+                    )
+                },
+                onFailure = { err ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isLoading = false,
+                        errorMessage = err.message ?: "Failed to load repositories",
+                    )
+                },
+            )
+        }
+    }
+
+    fun selectGitHubRepo(repo: GitHubRepoSummary) {
+        viewModelScope.launch {
+            val pat = preferencesRepository.getDecryptedGitHubPat()
+            if (pat.isBlank()) return@launch
+            gitHubState.value = gitHubState.value.copy(
+                selectedRepo = repo,
+                selectedBranch = repo.defaultBranch,
+                currentPath = "",
+                contents = emptyList(),
+                branches = emptyList(),
+                commitPreview = null,
+                lastCommitResult = null,
+                isLoading = true,
+                errorMessage = null,
+            )
+            val branches = gitHubRepository.listBranches(pat, repo.owner, repo.name).getOrDefault(emptyList())
+            val contentsRes = gitHubRepository.listContents(pat, repo.owner, repo.name, "", repo.defaultBranch)
+            contentsRes.fold(
+                onSuccess = { entries ->
+                    gitHubState.value = gitHubState.value.copy(
+                        branches = branches,
+                        contents = entries,
+                        isLoading = false,
+                        errorMessage = null,
+                    )
+                },
+                onFailure = { err ->
+                    gitHubState.value = gitHubState.value.copy(
+                        branches = branches,
+                        isLoading = false,
+                        errorMessage = err.message ?: "Failed to browse repository",
+                    )
+                },
+            )
+        }
+    }
+
+    fun backToGitHubRepos() {
+        gitHubState.value = gitHubState.value.copy(
+            selectedRepo = null,
+            branches = emptyList(),
+            selectedBranch = "",
+            currentPath = "",
+            contents = emptyList(),
+            commitPreview = null,
+            errorMessage = null,
+        )
+    }
+
+    fun selectGitHubBranch(branch: String) {
+        val repo = gitHubState.value.selectedRepo ?: return
+        viewModelScope.launch {
+            val pat = preferencesRepository.getDecryptedGitHubPat()
+            if (pat.isBlank()) return@launch
+            gitHubState.value = gitHubState.value.copy(
+                selectedBranch = branch,
+                commitPreview = null,
+                isLoading = true,
+                errorMessage = null,
+            )
+            gitHubRepository.listContents(pat, repo.owner, repo.name, gitHubState.value.currentPath, branch).fold(
+                onSuccess = { entries ->
+                    gitHubState.value = gitHubState.value.copy(
+                        contents = entries,
+                        isLoading = false,
+                    )
+                },
+                onFailure = { err ->
+                    // If folder doesn't exist on the newly selected branch, fall back to root
+                    val rootEntries = gitHubRepository.listContents(pat, repo.owner, repo.name, "", branch)
+                        .getOrNull()
+                    if (rootEntries != null) {
+                        gitHubState.value = gitHubState.value.copy(
+                            currentPath = "",
+                            contents = rootEntries,
+                            isLoading = false,
+                        )
+                    } else {
+                        gitHubState.value = gitHubState.value.copy(
+                            isLoading = false,
+                            errorMessage = err.message ?: "Failed to load branch contents",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun navigateGitHubPath(path: String) {
+        val repo = gitHubState.value.selectedRepo ?: return
+        val branch = gitHubState.value.selectedBranch.ifBlank { repo.defaultBranch }
+        viewModelScope.launch {
+            val pat = preferencesRepository.getDecryptedGitHubPat()
+            if (pat.isBlank()) return@launch
+            gitHubState.value = gitHubState.value.copy(isLoading = true, errorMessage = null)
+            gitHubRepository.listContents(pat, repo.owner, repo.name, path, branch).fold(
+                onSuccess = { entries ->
+                    gitHubState.value = gitHubState.value.copy(
+                        currentPath = path,
+                        contents = entries,
+                        isLoading = false,
+                    )
+                },
+                onFailure = { err ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isLoading = false,
+                        errorMessage = err.message ?: "Failed to open folder",
+                    )
+                },
+            )
+        }
+    }
+
+    fun attachGitHubFileToComposer(entry: GitHubContentEntry, onAttached: () -> Unit = {}) {
+        val repo = gitHubState.value.selectedRepo ?: return
+        val branch = gitHubState.value.selectedBranch.ifBlank { repo.defaultBranch }
+        viewModelScope.launch {
+            val pat = preferencesRepository.getDecryptedGitHubPat()
+            if (pat.isBlank()) return@launch
+            gitHubState.value = gitHubState.value.copy(isAttachingFile = true, errorMessage = null)
+            gitHubRepository.fetchFileContent(pat, repo.owner, repo.name, entry.path, branch).fold(
+                onSuccess = { file ->
+                    val ext = file.name.substringAfterLast('.', "txt")
+                    val (_, mime) = CodeArtifactUtils.inferExtensionAndMime(ext)
+                    val att = ChatAttachment(
+                        id = UUID.randomUUID().toString(),
+                        displayName = "${repo.name}/${file.path}",
+                        mimeType = mime,
+                        kind = AttachmentKind.DOCUMENT,
+                        extractedText = buildString {
+                            append("GitHub Repository: ${repo.fullName} (branch: $branch)\n")
+                            append("File Path: ${file.path}\n")
+                            append("SHA: ${file.sha}\n\n")
+                            append(file.contentText)
+                        },
+                        sizeBytes = file.sizeBytes,
+                    )
+                    stagedAttachments.value = stagedAttachments.value + att
+                    gitHubState.value = gitHubState.value.copy(isAttachingFile = false)
+                    showSnackbar("Attached ${file.path} from ${repo.name}")
+                    onAttached()
+                },
+                onFailure = { err ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isAttachingFile = false,
+                        errorMessage = err.message ?: "Could not read GitHub file",
+                    )
+                },
+            )
+        }
+    }
+
+    fun prepareGitHubCommitPreview(branch: String, targetPath: String, commitMessage: String) {
+        val repo = gitHubState.value.selectedRepo ?: return
+        val pending = gitHubState.value.pendingPush ?: return
+        viewModelScope.launch {
+            val pat = preferencesRepository.getDecryptedGitHubPat()
+            if (pat.isBlank()) return@launch
+            gitHubState.value = gitHubState.value.copy(isLoading = true, errorMessage = null)
+            gitHubRepository.prepareCommitPreview(
+                pat = pat,
+                owner = repo.owner,
+                repo = repo.name,
+                branch = branch,
+                rawPath = targetPath,
+                content = pending.code,
+                commitMessage = commitMessage,
+            ).fold(
+                onSuccess = { preview ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isLoading = false,
+                        commitPreview = preview,
+                        errorMessage = null,
+                    )
+                },
+                onFailure = { err ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isLoading = false,
+                        errorMessage = err.message ?: "Could not prepare commit preview",
+                    )
+                },
+            )
+        }
+    }
+
+    fun confirmGitHubCommit() {
+        val preview = gitHubState.value.commitPreview ?: return
+        viewModelScope.launch {
+            val pat = preferencesRepository.getDecryptedGitHubPat()
+            if (pat.isBlank()) return@launch
+            gitHubState.value = gitHubState.value.copy(isCommitting = true, errorMessage = null)
+            gitHubRepository.commitFile(pat, preview).fold(
+                onSuccess = { result ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isCommitting = false,
+                        commitPreview = null,
+                        pendingPush = null,
+                        lastCommitResult = result,
+                        errorMessage = null,
+                    )
+                    val verb = if (result.isUpdate) "Updated" else "Created"
+                    showSnackbar("$verb ${result.path} on ${result.branch} (${result.commitSha})")
+                    // Refresh current folder listing to reflect new/updated file
+                    navigateGitHubPath(gitHubState.value.currentPath)
+                },
+                onFailure = { err ->
+                    gitHubState.value = gitHubState.value.copy(
+                        isCommitting = false,
+                        errorMessage = err.message ?: "Commit failed",
+                    )
+                },
+            )
+        }
+    }
+
+    /**
+     * Wipes all volatile tokens/snapshots/GitHub repo state from ViewModel memory
+     * immediately when Biometric Vault Lock engages.
+     */
+    fun wipeSensitiveMemoryState() {
+        usageRepository.clearMemoryCache()
+        gitHubRepository.clearMemoryCache()
+        creditBalance.value = null
+        openRouterAlert.value = null
+        liveArtifactPreview.value = null
+        gitHubState.value = GitHubStudioUiState()
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -1342,6 +2022,398 @@ class ChatViewModel(
         }
     }
 
+    // --- Power Additions: Persona V2 Export, Global Lorebooks, Sampler Presets, Slash Templates, Context Compression & Compare ---
+
+    fun preparePersonaV2Export(
+        persona: PersonaCard,
+        onReady: (suggestedName: String, mimeType: String, content: String) -> Unit,
+    ) {
+        val json = personaCardEngine.exportAsSillyTavernV2Json(persona)
+        val safeName = persona.name
+            .replace(Regex("[^a-zA-Z0-9._-]"), "_")
+            .trim('_')
+            .ifBlank { "persona" }
+        onReady("${safeName}_v2.json", "application/json", json)
+    }
+
+    fun sharePersonaV2Json(persona: PersonaCard, onIntentReady: (Intent) -> Unit) {
+        preparePersonaV2Export(persona) { fileName, mimeType, content ->
+            viewModelScope.launch {
+                exportManager.createShareIntentForFile(fileName, mimeType, content).fold(
+                    onSuccess = onIntentReady,
+                    onFailure = { err -> showSnackbar("Share failed: ${err.message}") },
+                )
+            }
+        }
+    }
+
+    fun saveGlobalLorebook(book: GlobalLorebook) {
+        if (book.name.isBlank()) return
+        viewModelScope.launch {
+            vaultRepository.upsertGlobalLorebook(book)
+            showSnackbar("Saved shared lorebook: ${book.name}")
+        }
+    }
+
+    fun deleteGlobalLorebook(bookId: String) {
+        viewModelScope.launch {
+            val conv = activeConversationId.value?.let { vaultRepository.getConversation(it) }
+            if (conv != null && bookId in conv.enabledLorebookIds) {
+                vaultRepository.updateConversation(
+                    conv.copy(enabledLorebookIds = conv.enabledLorebookIds.filterNot { it == bookId }),
+                )
+            }
+            vaultRepository.deleteGlobalLorebook(bookId)
+            showSnackbar("Shared lorebook deleted")
+        }
+    }
+
+    fun toggleGlobalLorebookForActiveChat(bookId: String) {
+        viewModelScope.launch {
+            val conv = ensureActiveConversation()
+            val next = if (bookId in conv.enabledLorebookIds) {
+                conv.enabledLorebookIds.filterNot { it == bookId }
+            } else {
+                conv.enabledLorebookIds + bookId
+            }
+            vaultRepository.updateConversation(conv.copy(enabledLorebookIds = next))
+            showSnackbar(if (bookId in next) "Lorebook active in this chat" else "Lorebook detached from chat")
+        }
+    }
+
+    fun saveSamplerPreset(
+        name: String,
+        temperature: Float,
+        topP: Float,
+        maxTokens: Int,
+        reasoningEffort: ReasoningEffort,
+        systemPromptSnippet: String,
+    ) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch {
+            vaultRepository.upsertSamplerPreset(
+                SamplerPreset(
+                    id = UUID.randomUUID().toString(),
+                    name = clean,
+                    temperature = temperature.coerceIn(0f, 2f),
+                    topP = topP.coerceIn(0.05f, 1f),
+                    maxTokens = maxTokens.coerceIn(256, 65536),
+                    reasoningEffort = reasoningEffort,
+                    systemPromptSnippet = systemPromptSnippet.trim(),
+                    isBuiltIn = false,
+                ),
+            )
+            showSnackbar("Saved sampler preset: $clean")
+        }
+    }
+
+    fun deleteSamplerPreset(presetId: String) {
+        viewModelScope.launch {
+            vaultRepository.deleteSamplerPreset(presetId)
+            showSnackbar("Preset deleted")
+        }
+    }
+
+    fun saveSlashTemplate(command: String, title: String, body: String) {
+        val cleanCmd = command.trim().lowercase().removePrefix("/")
+        val cleanBody = body.trim()
+        if (cleanCmd.isEmpty() || cleanBody.isEmpty()) return
+        viewModelScope.launch {
+            vaultRepository.upsertSlashTemplate(
+                SlashPromptTemplate(
+                    id = UUID.randomUUID().toString(),
+                    command = cleanCmd,
+                    title = title.trim().ifBlank { cleanCmd },
+                    promptBody = cleanBody,
+                ),
+            )
+            showSnackbar("Saved /$cleanCmd template")
+        }
+    }
+
+    fun deleteSlashTemplate(templateId: String) {
+        viewModelScope.launch {
+            vaultRepository.deleteSlashTemplate(templateId)
+            showSnackbar("Slash template deleted")
+        }
+    }
+
+    fun compressActiveConversationContext() {
+        if (isCompressingContext.value || streamingState.value.isStreaming) return
+        viewModelScope.launch {
+            val apiKey = preferencesRepository.getDecryptedApiKey()
+            if (apiKey.isBlank()) {
+                showSnackbar("Add your OpenRouter API key to compress context")
+                return@launch
+            }
+            val conv = activeConversationId.value?.let { vaultRepository.getConversation(it) }
+            if (conv == null) {
+                showSnackbar("No active conversation to compress")
+                return@launch
+            }
+            val allMsgs = vaultRepository.getMessagesOnce(conv.id)
+            val uncompressed = allMsgs.filter { it.createdAt > conv.summarizedUpToTimestamp }
+            val keepRecentCount = 4
+            if (uncompressed.size <= keepRecentCount + 1) {
+                showSnackbar("Need at least ${keepRecentCount + 2} recent turns to compress")
+                return@launch
+            }
+            val toSummarize = uncompressed.dropLast(keepRecentCount)
+            val newCutoff = toSummarize.last().createdAt
+
+            isCompressingContext.value = true
+            streamClient.summarizeForContextCompression(
+                apiKey = apiKey,
+                modelId = conv.modelId,
+                existingSummary = conv.contextSummary,
+                messagesToSummarize = toSummarize,
+            ).fold(
+                onSuccess = { summary ->
+                    vaultRepository.updateConversation(
+                        conv.copy(
+                            contextSummary = summary,
+                            summarizedUpToTimestamp = newCutoff,
+                        ),
+                    )
+                    showSnackbar("Compressed ${toSummarize.size} older turns into rolling memory")
+                },
+                onFailure = { err ->
+                    if (err is OpenRouterApiException && err.alert != null) {
+                        openRouterAlert.value = err.alert
+                    }
+                    showSnackbar(err.message ?: "Context compression failed")
+                },
+            )
+            isCompressingContext.value = false
+        }
+    }
+
+    fun clearContextSummary() {
+        viewModelScope.launch {
+            val conv = activeConversationId.value?.let { vaultRepository.getConversation(it) } ?: return@launch
+            vaultRepository.updateConversation(
+                conv.copy(contextSummary = "", summarizedUpToTimestamp = 0L),
+            )
+            showSnackbar("Restored full message history to model context")
+        }
+    }
+
+    fun setCompareModelB(modelId: String) {
+        compareState.value = compareState.value.copy(modelBId = modelId)
+    }
+
+    fun stopSideBySideCompare() {
+        compareJobA?.cancel()
+        compareJobB?.cancel()
+        compareJobA = null
+        compareJobB = null
+        val cur = compareState.value
+        compareState.value = cur.copy(
+            laneA = cur.laneA.copy(isStreaming = false),
+            laneB = cur.laneB.copy(isStreaming = false),
+        )
+    }
+
+    fun runSideBySideCompare(prompt: String) {
+        val cleanPrompt = prompt.trim()
+        if (cleanPrompt.isEmpty()) return
+        stopSideBySideCompare()
+        viewModelScope.launch {
+            val apiKey = preferencesRepository.getDecryptedApiKey()
+            if (apiKey.isBlank()) {
+                showSnackbar("Add your OpenRouter API key in Settings first")
+                return@launch
+            }
+            val conv = ensureActiveConversation()
+            val prefs = preferencesState.value
+            val allModels = vaultRepository.observeModels().first()
+            val modelAId = conv.modelId
+            val modelBId = compareState.value.modelBId.ifBlank {
+                allModels.firstOrNull { it.id != modelAId }?.id ?: "openai/gpt-4.1"
+            }
+
+            val baseHistory = vaultRepository.getMessagesOnce(conv.id)
+            val tempUserMsg = ChatMessage(
+                id = UUID.randomUUID().toString(),
+                conversationId = conv.id,
+                role = "user",
+                content = cleanPrompt,
+                createdAt = System.currentTimeMillis(),
+            )
+            val combinedHistory = baseHistory + tempUserMsg
+
+            val clockSnapshot = liveClockProvider.refreshNow()
+            val folderInstructions = conv.folderId?.let { fId ->
+                vaultRepository.observeFolders().first().firstOrNull { it.id == fId }?.projectInstructions.orEmpty()
+            }.orEmpty()
+            val activePersona = conv.personaId?.let { vaultRepository.getPersonaById(it) }
+            val extraLore = if (conv.enabledLorebookIds.isNotEmpty()) {
+                vaultRepository.getGlobalLorebooksOnce()
+                    .filter { it.id in conv.enabledLorebookIds }
+                    .flatMap { it.entries }
+            } else emptyList()
+            val resolvedPersona = if (activePersona != null || extraLore.isNotEmpty()) {
+                personaCardEngine.buildResolvedPrompt(
+                    persona = activePersona,
+                    history = combinedHistory,
+                    userDisplayName = prefs.creatorProfile.displayName,
+                    clockSnapshot = clockSnapshot,
+                    use24HourClock = prefs.use24HourClock,
+                    extraLorebookEntries = extraLore,
+                )
+            } else null
+
+            compareState.value = ModelCompareUiState(
+                prompt = cleanPrompt,
+                modelBId = modelBId,
+                laneA = CompareLaneState(modelId = modelAId, isStreaming = true),
+                laneB = CompareLaneState(modelId = modelBId, isStreaming = true),
+            )
+
+            fun launchLane(isLaneA: Boolean, targetModelId: String): Job = viewModelScope.launch {
+                val startedAt = System.currentTimeMillis()
+                val laneConv = conv.copy(modelId = targetModelId, fallbackModelIds = emptyList())
+                val supportsTools = allModels.firstOrNull { it.id == targetModelId }?.supportsTools ?: true
+                try {
+                    streamClient.streamChatCompletion(
+                        apiKey = apiKey,
+                        conversation = laneConv,
+                        history = combinedHistory,
+                        modelSupportsTools = supportsTools,
+                        clockSnapshot = clockSnapshot,
+                        use24HourClock = prefs.use24HourClock,
+                        projectInstructions = folderInstructions,
+                        personaSystemBlock = resolvedPersona?.systemBlock.orEmpty(),
+                        postHistoryInstructions = resolvedPersona?.postHistoryInstructions.orEmpty(),
+                        includeLocalWebFetchTool = false,
+                    ).collect { event ->
+                        val elapsed = System.currentTimeMillis() - startedAt
+                        val cur = compareState.value
+                        val lane = if (isLaneA) cur.laneA else cur.laneB
+                        val updatedLane = when (event) {
+                            is OpenRouterStreamEvent.ContentDelta ->
+                                lane.copy(content = lane.content + event.text, elapsedMs = elapsed)
+                            is OpenRouterStreamEvent.ReasoningDelta ->
+                                lane.copy(reasoningText = lane.reasoningText + event.text, elapsedMs = elapsed)
+                            is OpenRouterStreamEvent.ReasoningDetailsUpdated ->
+                                lane.copy(reasoningDetailsJson = event.rawJsonArray, elapsedMs = elapsed)
+                            is OpenRouterStreamEvent.CitationsUpdated ->
+                                lane.copy(citations = event.citations, elapsedMs = elapsed)
+                            is OpenRouterStreamEvent.UsageUpdated ->
+                                lane.copy(promptTokens = event.promptTokens, completionTokens = event.completionTokens, elapsedMs = elapsed)
+                            is OpenRouterStreamEvent.Completed ->
+                                lane.copy(
+                                    content = event.fullContent.ifBlank { lane.content },
+                                    reasoningText = event.fullReasoning.ifBlank { lane.reasoningText },
+                                    reasoningDetailsJson = event.reasoningDetailsJson.ifBlank { lane.reasoningDetailsJson },
+                                    citations = event.citations.ifEmpty { lane.citations },
+                                    promptTokens = event.promptTokens,
+                                    completionTokens = event.completionTokens,
+                                    isStreaming = false,
+                                    elapsedMs = elapsed,
+                                )
+                            is OpenRouterStreamEvent.ToolCallsRequested -> lane
+                        }
+                        compareState.value = if (isLaneA) cur.copy(laneA = updatedLane) else cur.copy(laneB = updatedLane)
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val cur = compareState.value
+                    val lane = (if (isLaneA) cur.laneA else cur.laneB).copy(
+                        isStreaming = false,
+                        error = e.message ?: "Request failed",
+                    )
+                    compareState.value = if (isLaneA) cur.copy(laneA = lane) else cur.copy(laneB = lane)
+                } finally {
+                    val cur = compareState.value
+                    val lane = if (isLaneA) cur.laneA else cur.laneB
+                    if (lane.isStreaming) {
+                        val done = lane.copy(isStreaming = false)
+                        compareState.value = if (isLaneA) cur.copy(laneA = done) else cur.copy(laneB = done)
+                    }
+                }
+            }
+
+            compareJobA = launchLane(isLaneA = true, targetModelId = modelAId)
+            compareJobB = launchLane(isLaneA = false, targetModelId = modelBId)
+        }
+    }
+
+    fun commitCompareWinner(chooseModelA: Boolean) {
+        val state = compareState.value
+        val winner = if (chooseModelA) state.laneA else state.laneB
+        val runnerUp = if (chooseModelA) state.laneB else state.laneA
+        if (state.prompt.isBlank() || winner.content.isBlank()) return
+        stopSideBySideCompare()
+
+        viewModelScope.launch {
+            var conv = ensureActiveConversation()
+            val existing = vaultRepository.getMessagesOnce(conv.id)
+            if (existing.isEmpty() && conv.title == "New Conversation") {
+                conv = conv.copy(title = state.prompt.replace('\n', ' ').take(48).trim().ifBlank { "New Conversation" })
+                vaultRepository.updateConversation(conv)
+            }
+            val now = System.currentTimeMillis()
+            vaultRepository.saveMessage(
+                ChatMessage(
+                    id = UUID.randomUUID().toString(),
+                    conversationId = conv.id,
+                    role = "user",
+                    content = state.prompt,
+                    createdAt = now,
+                ),
+            )
+            val winnerSwipe = MessageSwipe(
+                content = winner.content,
+                reasoningContent = winner.reasoningText,
+                reasoningDetailsJson = winner.reasoningDetailsJson,
+                citations = winner.citations,
+                modelUsed = winner.modelId,
+                promptTokens = winner.promptTokens,
+                completionTokens = winner.completionTokens,
+                createdAt = now + 1L,
+            )
+            val swipes = buildList {
+                add(winnerSwipe)
+                if (runnerUp.content.isNotBlank()) {
+                    add(
+                        MessageSwipe(
+                            content = runnerUp.content,
+                            reasoningContent = runnerUp.reasoningText,
+                            reasoningDetailsJson = runnerUp.reasoningDetailsJson,
+                            citations = runnerUp.citations,
+                            modelUsed = runnerUp.modelId,
+                            promptTokens = runnerUp.promptTokens,
+                            completionTokens = runnerUp.completionTokens,
+                            createdAt = now + 2L,
+                        ),
+                    )
+                }
+            }
+            vaultRepository.saveMessage(
+                ChatMessage(
+                    id = UUID.randomUUID().toString(),
+                    conversationId = conv.id,
+                    role = "assistant",
+                    content = winnerSwipe.content,
+                    reasoningContent = winnerSwipe.reasoningContent,
+                    reasoningDetailsJson = winnerSwipe.reasoningDetailsJson,
+                    citations = winnerSwipe.citations,
+                    modelUsed = winnerSwipe.modelUsed,
+                    promptTokens = winnerSwipe.promptTokens,
+                    completionTokens = winnerSwipe.completionTokens,
+                    swipes = swipes,
+                    activeSwipeIndex = 0,
+                    createdAt = now + 1L,
+                ),
+            )
+            compareState.value = ModelCompareUiState(modelBId = state.modelBId)
+            showSnackbar("Committed ${winner.modelId.substringAfter('/')} (runner-up saved as swipe #2)")
+        }
+    }
+
     fun showSnackbar(message: String) {
         snackbarMessage.value = message
     }
@@ -1387,6 +2459,8 @@ class ChatViewModel(
                 personaCardEngine = container.personaCardEngine,
                 mcpClient = container.mcpClient,
                 voiceEngineManager = container.voiceEngineManager,
+                usageRepository = container.usageRepository,
+                gitHubRepository = container.gitHubRepository,
             ) as T
         }
     }

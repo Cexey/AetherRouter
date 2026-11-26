@@ -42,6 +42,30 @@ data class OpenRouterArchitectureDto(
     @Json(name = "input_modalities") val inputModalities: List<String>? = null,
 )
 
+@JsonClass(generateAdapter = true)
+data class OpenRouterCreditsResponseDto(
+    @Json(name = "data") val data: OpenRouterCreditsDataDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class OpenRouterCreditsDataDto(
+    @Json(name = "total_credits") val totalCredits: Double? = null,
+    @Json(name = "total_usage") val totalUsage: Double? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class OpenRouterAuthKeyResponseDto(
+    @Json(name = "data") val data: OpenRouterAuthKeyDataDto? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class OpenRouterAuthKeyDataDto(
+    @Json(name = "limit") val limit: Double? = null,
+    @Json(name = "limit_remaining") val limitRemaining: Double? = null,
+    @Json(name = "usage") val usage: Double? = null,
+    @Json(name = "is_free_tier") val isFreeTier: Boolean? = null,
+)
+
 interface OpenRouterApiService {
     @GET("api/v1/models")
     suspend fun getModels(
@@ -49,6 +73,20 @@ interface OpenRouterApiService {
         @Header("HTTP-Referer") referer: String = "https://aetherrouter.local",
         @Header("X-Title") title: String = "AetherRouter",
     ): OpenRouterModelsResponseDto
+
+    @GET("api/v1/credits")
+    suspend fun getCredits(
+        @Header("Authorization") authorization: String,
+        @Header("HTTP-Referer") referer: String = "https://aetherrouter.local",
+        @Header("X-Title") title: String = "AetherRouter",
+    ): OpenRouterCreditsResponseDto
+
+    @GET("api/v1/auth/key")
+    suspend fun getAuthKey(
+        @Header("Authorization") authorization: String,
+        @Header("HTTP-Referer") referer: String = "https://aetherrouter.local",
+        @Header("X-Title") title: String = "AetherRouter",
+    ): OpenRouterAuthKeyResponseDto
 }
 
 object OpenRouterNetworkFactory {

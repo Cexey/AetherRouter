@@ -171,6 +171,18 @@ data class UrlCitation(
     val snippet: String = "",
 )
 
+data class MessageSwipe(
+    val content: String,
+    val reasoningContent: String = "",
+    val reasoningDetailsJson: String = "",
+    val thinkingDurationMs: Long = 0L,
+    val citations: List<UrlCitation> = emptyList(),
+    val modelUsed: String = "",
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
 data class ChatMessage(
     val id: String,
     val conversationId: String,
@@ -191,6 +203,8 @@ data class ChatMessage(
     val completionTokens: Int = 0,
     val toolCallsJson: String = "",
     val toolCallId: String = "",
+    val swipes: List<MessageSwipe> = emptyList(),
+    val activeSwipeIndex: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
 )
 
@@ -199,6 +213,10 @@ data class Conversation(
     val folderId: String? = null,
     val personaId: String? = null,
     val enabledMcpServerIds: List<String> = emptyList(),
+    val fallbackModelIds: List<String> = emptyList(),
+    val enabledLorebookIds: List<String> = emptyList(),
+    val contextSummary: String = "",
+    val summarizedUpToTimestamp: Long = 0L,
     val title: String,
     val modelId: String,
     val systemPromptOverride: String = "",
@@ -258,6 +276,41 @@ data class McpServerConfig(
     val isEnabled: Boolean = true,
     val tools: List<McpToolDef> = emptyList(),
     val lastSyncedAt: Long = 0L,
+)
+
+data class GlobalLorebook(
+    val id: String,
+    val name: String,
+    val description: String = "",
+    val entries: List<LorebookEntry> = emptyList(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+data class SamplerPreset(
+    val id: String,
+    val name: String,
+    val temperature: Float = 0.7f,
+    val topP: Float = 1.0f,
+    val maxTokens: Int = 4096,
+    val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
+    val systemPromptSnippet: String = "",
+    val isBuiltIn: Boolean = false,
+)
+
+data class SlashPromptTemplate(
+    val id: String,
+    val command: String, // e.g. "summarize" -> invoked as /summarize
+    val title: String,
+    val promptBody: String,
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+data class OpenRouterCreditBalance(
+    val totalCreditsUsd: Double? = null,
+    val totalUsageUsd: Double = 0.0,
+    val remainingUsd: Double? = null,
+    val isFreeTier: Boolean = false,
+    val fetchedAt: Long = 0L,
 )
 
 data class Folder(
@@ -328,6 +381,8 @@ data class AppPreferences(
     val biometricLockEnabled: Boolean = false,
     val smartRepliesEnabled: Boolean = true,
     val hasApiKey: Boolean = false,
+    val hasManagementApiKey: Boolean = false,
+    val hasGitHubPat: Boolean = false,
 ) {
     val themeMode: ThemeMode get() = appearance.themeMode
     val useDynamicColor: Boolean get() = appearance.useDynamicColor

@@ -33,6 +33,8 @@ class PreferencesRepository(
 ) {
     private object Keys {
         val ENCRYPTED_API_KEY = stringPreferencesKey("encrypted_openrouter_api_key")
+        val ENCRYPTED_MANAGEMENT_API_KEY = stringPreferencesKey("encrypted_openrouter_management_api_key")
+        val ENCRYPTED_GITHUB_PAT = stringPreferencesKey("encrypted_github_pat")
 
         // Appearance, Typography & Zoom
         val THEME_MODE = stringPreferencesKey("theme_mode")
@@ -87,6 +89,8 @@ class PreferencesRepository(
 
     val appPreferences: Flow<AppPreferences> = context.aetherDataStore.data.map { prefs ->
         val encryptedKey = prefs[Keys.ENCRYPTED_API_KEY].orEmpty()
+        val encryptedMgmtKey = prefs[Keys.ENCRYPTED_MANAGEMENT_API_KEY].orEmpty()
+        val encryptedGithubPat = prefs[Keys.ENCRYPTED_GITHUB_PAT].orEmpty()
         AppPreferences(
             appearance = AppearanceConfig(
                 themeMode = ThemeMode.fromString(prefs[Keys.THEME_MODE]),
@@ -124,6 +128,8 @@ class PreferencesRepository(
             biometricLockEnabled = prefs[Keys.BIOMETRIC_LOCK_ENABLED] ?: false,
             smartRepliesEnabled = prefs[Keys.SMART_REPLIES_ENABLED] ?: true,
             hasApiKey = encryptedKey.isNotBlank(),
+            hasManagementApiKey = encryptedMgmtKey.isNotBlank(),
+            hasGitHubPat = encryptedGithubPat.isNotBlank(),
         )
     }
 
@@ -153,6 +159,32 @@ class PreferencesRepository(
 
     suspend fun getDecryptedApiKey(): String {
         val encrypted = context.aetherDataStore.data.first()[Keys.ENCRYPTED_API_KEY].orEmpty()
+        return if (encrypted.isBlank()) "" else cryptoManager.decrypt(encrypted).trim()
+    }
+
+    suspend fun saveManagementApiKey(rawKey: String) {
+        val trimmed = rawKey.trim()
+        val encrypted = if (trimmed.isEmpty()) "" else cryptoManager.encrypt(trimmed)
+        context.aetherDataStore.edit { prefs ->
+            prefs[Keys.ENCRYPTED_MANAGEMENT_API_KEY] = encrypted
+        }
+    }
+
+    suspend fun getDecryptedManagementApiKey(): String {
+        val encrypted = context.aetherDataStore.data.first()[Keys.ENCRYPTED_MANAGEMENT_API_KEY].orEmpty()
+        return if (encrypted.isBlank()) "" else cryptoManager.decrypt(encrypted).trim()
+    }
+
+    suspend fun saveGitHubPat(rawToken: String) {
+        val trimmed = rawToken.trim()
+        val encrypted = if (trimmed.isEmpty()) "" else cryptoManager.encrypt(trimmed)
+        context.aetherDataStore.edit { prefs ->
+            prefs[Keys.ENCRYPTED_GITHUB_PAT] = encrypted
+        }
+    }
+
+    suspend fun getDecryptedGitHubPat(): String {
+        val encrypted = context.aetherDataStore.data.first()[Keys.ENCRYPTED_GITHUB_PAT].orEmpty()
         return if (encrypted.isBlank()) "" else cryptoManager.decrypt(encrypted).trim()
     }
 

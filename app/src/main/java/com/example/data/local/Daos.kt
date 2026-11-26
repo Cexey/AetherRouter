@@ -62,6 +62,9 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE conversationId = :conversationId AND createdAt > :afterEpochMillis")
     suspend fun deleteMessagesAfter(conversationId: String, afterEpochMillis: Long)
+
+    @Query("DELETE FROM messages WHERE conversationId = :conversationId")
+    suspend fun deleteAllMessagesForConversation(conversationId: String)
 }
 
 @Dao
@@ -125,4 +128,55 @@ interface McpServerDao {
 
     @Query("DELETE FROM mcp_servers WHERE id = :id")
     suspend fun deleteServerById(id: String)
+}
+
+@Dao
+interface GlobalLorebookDao {
+    @Query("SELECT * FROM global_lorebooks ORDER BY updatedAt DESC")
+    fun observeAllLorebooks(): Flow<List<GlobalLorebookEntity>>
+
+    @Query("SELECT * FROM global_lorebooks")
+    suspend fun getAllLorebooksOnce(): List<GlobalLorebookEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertLorebook(lorebook: GlobalLorebookEntity)
+
+    @Query("DELETE FROM global_lorebooks WHERE id = :id")
+    suspend fun deleteLorebookById(id: String)
+}
+
+@Dao
+interface SamplerPresetDao {
+    @Query("SELECT * FROM sampler_presets ORDER BY isBuiltIn DESC, name ASC")
+    fun observeAllPresets(): Flow<List<SamplerPresetEntity>>
+
+    @Query("SELECT COUNT(*) FROM sampler_presets")
+    suspend fun getPresetCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPresets(presets: List<SamplerPresetEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPreset(preset: SamplerPresetEntity)
+
+    @Query("DELETE FROM sampler_presets WHERE id = :id")
+    suspend fun deletePresetById(id: String)
+}
+
+@Dao
+interface SlashPromptTemplateDao {
+    @Query("SELECT * FROM slash_prompt_templates ORDER BY command ASC")
+    fun observeAllTemplates(): Flow<List<SlashPromptTemplateEntity>>
+
+    @Query("SELECT COUNT(*) FROM slash_prompt_templates")
+    suspend fun getTemplateCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertTemplates(templates: List<SlashPromptTemplateEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertTemplate(template: SlashPromptTemplateEntity)
+
+    @Query("DELETE FROM slash_prompt_templates WHERE id = :id")
+    suspend fun deleteTemplateById(id: String)
 }

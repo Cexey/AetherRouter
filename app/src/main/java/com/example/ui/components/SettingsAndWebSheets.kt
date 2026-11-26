@@ -1,6 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,18 +16,30 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Route
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -49,6 +63,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.core.BiometricVaultHelper
 import com.example.data.model.AppPreferences
@@ -56,7 +71,11 @@ import com.example.data.model.Conversation
 import com.example.data.model.CreatorProfile
 import com.example.data.model.ExportFormat
 import com.example.data.model.LinkOpenBehavior
+import com.example.data.model.ModelInfo
+import com.example.data.model.OpenRouterCreditBalance
+import com.example.data.model.OpenRouterUsageSnapshot
 import com.example.data.model.ReasoningEffort
+import com.example.data.model.SamplerPreset
 import com.example.data.model.ThemeMode
 import com.example.data.model.WebSearchEngine
 import com.example.data.model.WebSearchMode
@@ -67,6 +86,14 @@ import kotlin.math.roundToInt
 fun VaultAndPreferencesSheet(
     preferences: AppPreferences,
     hasActiveConversation: Boolean,
+    creditBalance: OpenRouterCreditBalance? = null,
+    usageSnapshot: OpenRouterUsageSnapshot? = null,
+    isLoadingCredits: Boolean = false,
+    onRefreshCredits: () -> Unit = {},
+    onOpenUsageStudio: () -> Unit = {},
+    onSaveManagementApiKey: (String) -> Unit = {},
+    onSaveGitHubPat: (String) -> Unit = {},
+    onOpenGitHubStudio: () -> Unit = {},
     onDismiss: () -> Unit,
     onSaveApiKey: (String) -> Unit,
     onOpenAppearanceStudio: () -> Unit,
@@ -91,6 +118,10 @@ fun VaultAndPreferencesSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var apiKeyInput by remember { mutableStateOf("") }
     var showKey by remember { mutableStateOf(false) }
+    var mgmtKeyInput by remember { mutableStateOf("") }
+    var showMgmtKey by remember { mutableStateOf(false) }
+    var githubPatInput by remember { mutableStateOf("") }
+    var showGithubPat by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -116,6 +147,18 @@ fun VaultAndPreferencesSheet(
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 )
             }
+
+            // Compact Live Spend & Remaining Credits Pill in Settings Header
+            CompactSpendCreditsPill(
+                usageSnapshot = usageSnapshot,
+                hasApiKey = preferences.hasApiKey,
+                isLoading = isLoadingCredits,
+                onClick = {
+                    onDismiss()
+                    onOpenUsageStudio()
+                },
+                testTagName = "settings_credits_pill",
+            )
 
             // Encrypted OpenRouter API Key Card
             Surface(
@@ -186,6 +229,243 @@ fun VaultAndPreferencesSheet(
                             OutlinedButton(
                                 onClick = { onSaveApiKey("") },
                                 modifier = Modifier.testTag("clear_api_key_button"),
+                            ) {
+                                Text("Clear")
+                            }
+                        }
+                    }
+
+                    // Live OpenRouter Credit Balance Strip
+                    if (preferences.hasApiKey) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.AccountBalanceWallet,
+                                contentDescription = "OpenRouter credit balance",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                val balanceHeadline = when {
+                                    creditBalance == null -> "Tap refresh to check OpenRouter credits"
+                                    creditBalance.remainingUsd != null ->
+                                        "Remaining: ${String.format("$%.2f", creditBalance.remainingUsd)}"
+                                    creditBalance.isFreeTier -> "OpenRouter Free Tier"
+                                    else -> "Active Key (No credit cap)"
+                                }
+                                Text(
+                                    text = balanceHeadline,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    modifier = Modifier.testTag("openrouter_credit_balance_text"),
+                                )
+                                if (creditBalance != null) {
+                                    Text(
+                                        text = "Total used: ${String.format("$%.4f", creditBalance.totalUsageUsd)}",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ),
+                                    )
+                                }
+                            }
+                            IconButton(
+                                onClick = onRefreshCredits,
+                                enabled = !isLoadingCredits,
+                                modifier = Modifier.testTag("refresh_credits_button"),
+                            ) {
+                                if (isLoadingCredits) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = "Refresh credit balance",
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Optional OpenRouter Management API Key (30-Day Activity Breakdown)
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.BarChart,
+                            contentDescription = "OpenRouter Management API Key",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = if (preferences.hasManagementApiKey) {
+                                "Management API Key Saved (AES-256-GCM)"
+                            } else {
+                                "OpenRouter Management Key (Optional)"
+                            },
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        )
+                    }
+                    Text(
+                        text = "Unlocks 30-day model & date spend breakdown via /api/v1/activity in Usage & Credits Studio.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                    OutlinedTextField(
+                        value = mgmtKeyInput,
+                        onValueChange = { mgmtKeyInput = it },
+                        label = {
+                            Text(
+                                if (preferences.hasManagementApiKey) "Replace Management API key"
+                                else "Enter OpenRouter Management API key",
+                            )
+                        },
+                        singleLine = true,
+                        visualTransformation = if (showMgmtKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showMgmtKey = !showMgmtKey }) {
+                                Icon(
+                                    imageVector = if (showMgmtKey) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                    contentDescription = if (showMgmtKey) "Hide management key" else "Show management key",
+                                )
+                            }
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("management_api_key_input"),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                if (mgmtKeyInput.isNotBlank()) {
+                                    onSaveManagementApiKey(mgmtKeyInput)
+                                    mgmtKeyInput = ""
+                                }
+                            },
+                            enabled = mgmtKeyInput.isNotBlank(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("save_management_api_key_button"),
+                        ) {
+                            Text("Encrypt & Load 30d")
+                        }
+                        if (preferences.hasManagementApiKey) {
+                            OutlinedButton(
+                                onClick = { onSaveManagementApiKey("") },
+                                modifier = Modifier.testTag("clear_management_api_key_button"),
+                            ) {
+                                Text("Clear")
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Optional GitHub Personal Access Token (PAT) for GitHub Repo Studio
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Code,
+                            contentDescription = "GitHub Personal Access Token",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = if (preferences.hasGitHubPat) {
+                                "GitHub PAT Saved (AES-256-GCM)"
+                            } else {
+                                "GitHub Personal Access Token (Optional)"
+                            },
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        )
+                    }
+                    Text(
+                        text = "Browse repos, attach source files to chat, and push AI code commits to any branch via api.github.com.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    )
+                    OutlinedTextField(
+                        value = githubPatInput,
+                        onValueChange = { githubPatInput = it },
+                        label = {
+                            Text(
+                                if (preferences.hasGitHubPat) "Replace GitHub PAT (ghp_... / github_pat_...)"
+                                else "Enter GitHub Personal Access Token",
+                            )
+                        },
+                        singleLine = true,
+                        visualTransformation = if (showGithubPat) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showGithubPat = !showGithubPat }) {
+                                Icon(
+                                    imageVector = if (showGithubPat) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                    contentDescription = if (showGithubPat) "Hide GitHub token" else "Show GitHub token",
+                                )
+                            }
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("github_pat_input"),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                if (githubPatInput.isNotBlank()) {
+                                    onSaveGitHubPat(githubPatInput)
+                                    githubPatInput = ""
+                                }
+                            },
+                            enabled = githubPatInput.isNotBlank(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("save_github_pat_button"),
+                        ) {
+                            Text("Encrypt & Verify")
+                        }
+                        if (preferences.hasGitHubPat) {
+                            OutlinedButton(
+                                onClick = {
+                                    onDismiss()
+                                    onOpenGitHubStudio()
+                                },
+                                modifier = Modifier.testTag("settings_open_github_studio_button"),
+                            ) {
+                                Text("Browse")
+                            }
+                            OutlinedButton(
+                                onClick = { onSaveGitHubPat("") },
+                                modifier = Modifier.testTag("clear_github_pat_button"),
                             ) {
                                 Text("Clear")
                             }
@@ -345,6 +625,17 @@ fun VaultAndPreferencesSheet(
 fun WebAndSamplerSheet(
     conversation: Conversation?,
     preferences: AppPreferences,
+    allModels: List<ModelInfo> = emptyList(),
+    samplerPresets: List<SamplerPreset> = emptyList(),
+    onSaveSamplerPreset: (
+        name: String,
+        temperature: Float,
+        topP: Float,
+        maxTokens: Int,
+        reasoningEffort: ReasoningEffort,
+        systemPromptSnippet: String,
+    ) -> Unit = { _, _, _, _, _, _ -> },
+    onDeleteSamplerPreset: (String) -> Unit = {},
     onDismiss: () -> Unit,
     onSave: (
         systemPrompt: String,
@@ -357,6 +648,7 @@ fun WebAndSamplerSheet(
         webSearchEngine: WebSearchEngine,
         webMaxResults: Int,
         webMaxTotalResults: Int,
+        fallbackModelIds: List<String>,
     ) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -382,6 +674,12 @@ fun WebAndSamplerSheet(
     var webMaxTotalResults by remember(conversation) {
         mutableIntStateOf(conversation?.webMaxTotalResults ?: preferences.defaultWebMaxTotalResults)
     }
+    var fallbackModelIds by remember(conversation) {
+        mutableStateOf(conversation?.fallbackModelIds ?: emptyList())
+    }
+    var showFallbackPickerMenu by remember { mutableStateOf(false) }
+    var showSavePresetRow by remember { mutableStateOf(false) }
+    var newPresetName by remember { mutableStateOf("") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -481,6 +779,99 @@ fun WebAndSamplerSheet(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
+            // Sampler Presets (Built-in & Custom)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "Sampler Presets",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                )
+                OutlinedButton(
+                    onClick = { showSavePresetRow = !showSavePresetRow },
+                    modifier = Modifier.testTag("toggle_save_preset_button"),
+                ) {
+                    Icon(Icons.Outlined.BookmarkAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Save Current")
+                }
+            }
+
+            if (samplerPresets.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    samplerPresets.forEach { preset ->
+                        InputChip(
+                            selected = false,
+                            onClick = {
+                                temperature = preset.temperature
+                                topP = preset.topP
+                                maxTokens = preset.maxTokens
+                                reasoningEffort = preset.reasoningEffort
+                                if (preset.systemPromptSnippet.isNotBlank()) {
+                                    systemPrompt = preset.systemPromptSnippet
+                                }
+                            },
+                            label = { Text(preset.name) },
+                            trailingIcon = if (!preset.isBuiltIn) {
+                                {
+                                    IconButton(
+                                        onClick = { onDeleteSamplerPreset(preset.id) },
+                                        modifier = Modifier.size(18.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Close,
+                                            contentDescription = "Delete preset",
+                                            modifier = Modifier.size(14.dp),
+                                        )
+                                    }
+                                }
+                            } else null,
+                        )
+                    }
+                }
+            }
+
+            if (showSavePresetRow) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = newPresetName,
+                        onValueChange = { newPresetName = it },
+                        label = { Text("New Preset Name") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(
+                        enabled = newPresetName.isNotBlank(),
+                        onClick = {
+                            onSaveSamplerPreset(
+                                newPresetName.trim(),
+                                temperature,
+                                topP,
+                                maxTokens,
+                                reasoningEffort,
+                                systemPrompt,
+                            )
+                            newPresetName = ""
+                            showSavePresetRow = false
+                        },
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+
             // Reasoning Effort
             Text(
                 text = "Reasoning Effort",
@@ -527,6 +918,92 @@ fun WebAndSamplerSheet(
                 onValueChange = { maxTokens = ((it / 256f).roundToInt() * 256).coerceIn(512, 16384) },
             )
 
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            // OpenRouter Automatic Fallback Routing
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Route,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = "Fallback Model Routing",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
+                Box {
+                    OutlinedButton(
+                        enabled = fallbackModelIds.size < 3 && allModels.isNotEmpty(),
+                        onClick = { showFallbackPickerMenu = true },
+                        modifier = Modifier.testTag("add_fallback_model_button"),
+                    ) {
+                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add")
+                    }
+                    val primaryId = conversation?.modelId ?: preferences.defaultModelId
+                    val candidates = remember(allModels, primaryId, fallbackModelIds) {
+                        allModels.filter { it.id != primaryId && it.id !in fallbackModelIds }.take(25)
+                    }
+                    DropdownMenu(
+                        expanded = showFallbackPickerMenu,
+                        onDismissRequest = { showFallbackPickerMenu = false },
+                    ) {
+                        candidates.forEach { m ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = "${m.name} (${m.company})",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                                onClick = {
+                                    fallbackModelIds = (fallbackModelIds + m.id).distinct().take(3)
+                                    showFallbackPickerMenu = false
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            Text(
+                text = "If the primary model hits a rate limit or provider outage, OpenRouter automatically fails over down this ordered list.",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            )
+            if (fallbackModelIds.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    fallbackModelIds.forEachIndexed { idx, fid ->
+                        val label = allModels.firstOrNull { it.id == fid }?.name ?: fid.substringAfter('/')
+                        InputChip(
+                            selected = true,
+                            onClick = { fallbackModelIds = fallbackModelIds.filterNot { it == fid } },
+                            label = { Text("#${idx + 1} $label") },
+                            trailingIcon = {
+                                Icon(Icons.Outlined.Close, contentDescription = "Remove fallback", modifier = Modifier.size(14.dp))
+                            },
+                        )
+                    }
+                }
+            }
+
             // Custom System Prompt Override
             OutlinedTextField(
                 value = systemPrompt,
@@ -554,6 +1031,7 @@ fun WebAndSamplerSheet(
                         webEngine,
                         webMaxResults,
                         webMaxTotalResults,
+                        fallbackModelIds,
                     )
                     onDismiss()
                 },

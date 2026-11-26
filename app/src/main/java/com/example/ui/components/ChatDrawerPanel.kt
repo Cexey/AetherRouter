@@ -6,10 +6,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.DriveFileMove
@@ -59,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Conversation
 import com.example.data.model.Folder
+import com.example.data.model.OpenRouterUsageSnapshot
 import com.example.ui.theme.parseHexColorOrNull
 
 @Composable
@@ -81,6 +85,11 @@ fun ChatDrawerBody(
     onOpenMcpHub: () -> Unit,
     onOpenAppearanceStudio: () -> Unit,
     onOpenSettings: () -> Unit,
+    usageSnapshot: OpenRouterUsageSnapshot? = null,
+    hasApiKey: Boolean = false,
+    isLoadingUsage: Boolean = false,
+    onOpenUsageStudio: () -> Unit = {},
+    onOpenGitHubStudio: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val folderById = remember(folders) { folders.associateBy { it.id } }
@@ -117,6 +126,15 @@ fun ChatDrawerBody(
                 }
             }
         }
+
+        // Compact Tappable Live OpenRouter Spend / Remaining Credits Pill
+        CompactSpendCreditsPill(
+            usageSnapshot = usageSnapshot,
+            hasApiKey = hasApiKey,
+            isLoading = isLoadingUsage,
+            onClick = onOpenUsageStudio,
+            testTagName = "drawer_credits_pill",
+        )
 
         // Encrypted Full-Text Search
         OutlinedTextField(
@@ -344,29 +362,44 @@ fun ChatDrawerBody(
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val drawerPillPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedButton(
                     onClick = onOpenPersonaStudio,
+                    contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 44.dp)
                         .testTag("drawer_personas_button"),
                 ) {
                     Icon(Icons.Outlined.Face, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Personas")
+                    Text(
+                        text = "Personas",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 OutlinedButton(
                     onClick = onOpenMcpHub,
+                    contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 44.dp)
                         .testTag("drawer_mcp_hub_button"),
                 ) {
                     Icon(Icons.Outlined.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("MCP Tools")
+                    Text(
+                        text = "MCP Tools",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
             Row(
@@ -375,24 +408,55 @@ fun ChatDrawerBody(
             ) {
                 OutlinedButton(
                     onClick = onOpenAppearanceStudio,
+                    contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 44.dp)
                         .testTag("drawer_appearance_button"),
                 ) {
                     Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Theme")
+                    Text(
+                        text = "Theme",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 OutlinedButton(
                     onClick = onOpenSettings,
+                    contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 44.dp)
                         .testTag("drawer_settings_button"),
                 ) {
                     Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Settings")
+                    Text(
+                        text = "Settings",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
+            }
+            OutlinedButton(
+                onClick = onOpenGitHubStudio,
+                contentPadding = drawerPillPadding,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+                    .testTag("drawer_github_studio_button"),
+            ) {
+                Icon(Icons.Outlined.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "GitHub Repo Studio",
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

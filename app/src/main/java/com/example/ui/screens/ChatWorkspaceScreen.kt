@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,17 +35,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Tune
@@ -86,6 +92,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.ImageLoader
+import com.example.core.CodeArtifactUtils
+import com.example.core.ContextAndCostEstimator
 import com.example.core.LiveClockProvider
 import com.example.data.model.ChatMessage
 import com.example.data.model.Conversation
@@ -96,15 +104,23 @@ import com.example.ui.components.AttachWebpageUrlDialog
 import com.example.ui.components.ChatComposerPanel
 import com.example.ui.components.ChatDrawerBody
 import com.example.ui.components.ChatMessageItem
+import com.example.ui.components.CompressedContextBanner
+import com.example.ui.components.ContextAndCostBar
 import com.example.ui.components.DayDividerHeader
+import com.example.ui.components.GitHubStudioOverlay
 import com.example.ui.components.InAppBrowserOverlay
 import com.example.ui.components.LinkActionChooserSheet
+import com.example.ui.components.LiveArtifactPreviewOverlay
 import com.example.ui.components.McpToolsHubOverlay
+import com.example.ui.components.ModelCompareOverlay
 import com.example.ui.components.ModelPickerOverlay
 import com.example.ui.components.MoveToFolderDialog
 import com.example.ui.components.PersonaStudioOverlay
 import com.example.ui.components.ProjectFolderDialog
+import com.example.ui.components.SlashCommandEntry
+import com.example.ui.components.SlashTemplatesManagerDialog
 import com.example.ui.components.StreamingAssistantBubble
+import com.example.ui.components.UsageAndCreditsStudioOverlay
 import com.example.ui.components.VaultAndPreferencesSheet
 import com.example.ui.components.VoiceModeOverlay
 import com.example.ui.components.WebAndSamplerSheet
@@ -154,13 +170,17 @@ fun ChatWorkspaceScreen(
     val scope = rememberCoroutineScope()
 
     var showModelPicker by remember { mutableStateOf(false) }
+    var showModelCompare by remember { mutableStateOf(false) }
     var showAppearanceStudio by remember { mutableStateOf(false) }
     var showPersonaStudio by remember { mutableStateOf(false) }
     var showMcpHub by remember { mutableStateOf(false) }
     var showVoiceMode by remember { mutableStateOf(false) }
+    var showUsageStudio by remember { mutableStateOf(false) }
+    var showGitHubStudio by remember { mutableStateOf(false) }
     var showVaultSheet by remember { mutableStateOf(false) }
     var showWebSamplerSheet by remember { mutableStateOf(false) }
     var showAttachUrlDialog by remember { mutableStateOf(false) }
+    var showSlashTemplatesDialog by remember { mutableStateOf(false) }
     var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
     var editingFolderDialog by remember { mutableStateOf<Pair<Boolean, Folder?>>(false to null) }
     var movingConversation by remember { mutableStateOf<Conversation?>(null) }
@@ -334,6 +354,19 @@ fun ChatWorkspaceScreen(
                     if (closeAfter) scope.launch { drawerState.close() }
                     showVaultSheet = true
                 },
+                usageSnapshot = uiState.usageSnapshot,
+                hasApiKey = uiState.preferences.hasApiKey,
+                isLoadingUsage = uiState.isLoadingCredits,
+                onOpenUsageStudio = {
+                    if (closeAfter) scope.launch { drawerState.close() }
+                    showUsageStudio = true
+                    chatViewModel.refreshUsageAndActivity(silent = true)
+                },
+                onOpenGitHubStudio = {
+                    if (closeAfter) scope.launch { drawerState.close() }
+                    chatViewModel.clearGitHubPendingPush()
+                    showGitHubStudio = true
+                },
             )
         }
 
@@ -347,9 +380,11 @@ fun ChatWorkspaceScreen(
                         showDrawerButton = !isExpandedLayout,
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onOpenModelPicker = { showModelPicker = true },
+                        onOpenModelCompare = { showModelCompare = true },
                         onOpenPersonaStudio = { showPersonaStudio = true },
                         onOpenMcpHub = { showMcpHub = true },
                         onToggleWebSearch = chatViewModel::toggleQuickWebSearch,
+                        onCompressContext = chatViewModel::compressActiveConversationContext,
                         onOpenWebSampler = { showWebSamplerSheet = true },
                         onOpenVaultSettings = { showVaultSheet = true },
                         onNewChat = chatViewModel::startNewConversation,
@@ -361,6 +396,7 @@ fun ChatWorkspaceScreen(
                         stagedAttachments = uiState.stagedAttachments,
                         customStickers = uiState.customStickers,
                         smartReplies = uiState.smartReplies,
+                        slashTemplates = uiState.slashTemplates,
                         imageLoader = animatedImageLoader,
                         isStreaming = uiState.streaming.isStreaming,
                         isProcessingAttachment = uiState.isProcessingAttachment,
@@ -372,6 +408,18 @@ fun ChatWorkspaceScreen(
                         onSelectSmartReply = { suggestion ->
                             chatViewModel.sendMessage(overrideText = suggestion)
                         },
+                        onSlashCommandAction = { entry ->
+                            when (entry) {
+                                SlashCommandEntry.ToggleWeb -> chatViewModel.toggleQuickWebSearch()
+                                SlashCommandEntry.CompareModels -> showModelCompare = true
+                                SlashCommandEntry.OpenPersonas -> showPersonaStudio = true
+                                SlashCommandEntry.CompressContext -> chatViewModel.compressActiveConversationContext()
+                                SlashCommandEntry.NewChat -> chatViewModel.startNewConversation()
+                                SlashCommandEntry.ClearChat -> chatViewModel.clearActiveConversationMessages()
+                                is SlashCommandEntry.CustomTemplate -> Unit
+                            }
+                        },
+                        onManageSlashTemplatesClick = { showSlashTemplatesDialog = true },
                         onOpenVoiceMode = ::openVoiceModeWithPermission,
                         onOpenKeySetup = { showVaultSheet = true },
                         onAttachUrl = chatViewModel::attachWebpageToComposer,
@@ -384,6 +432,16 @@ fun ChatWorkspaceScreen(
                             documentPickerLauncher.launch(arrayOf("*/*"))
                         },
                         onOpenAttachUrlDialog = { showAttachUrlDialog = true },
+                        onBrowseGitHubClick = {
+                            chatViewModel.clearGitHubPendingPush()
+                            showGitHubStudio = true
+                        },
+                        openRouterAlert = uiState.openRouterAlert,
+                        onDismissAlert = chatViewModel::dismissOpenRouterAlert,
+                        onOpenUsageStudio = {
+                            showUsageStudio = true
+                            chatViewModel.refreshUsageAndActivity(silent = true)
+                        },
                         onRemoveStagedAttachment = chatViewModel::removeStagedAttachment,
                         onRichKeyboardMedia = { uris -> chatViewModel.addAttachmentsFromUris(uris) },
                         onAttachSticker = chatViewModel::attachCustomSticker,
@@ -404,10 +462,12 @@ fun ChatWorkspaceScreen(
                         .padding(innerPadding),
                     onOpenKeySetup = { showVaultSheet = true },
                     onOpenModelPicker = { showModelPicker = true },
+                    onOpenModelCompare = { showModelCompare = true },
                     onOpenPersonaStudio = { showPersonaStudio = true },
                     onOpenMcpHub = { showMcpHub = true },
                     onOpenAppearanceStudio = { showAppearanceStudio = true },
                     onOpenWebSampler = { showWebSamplerSheet = true },
+                    onClearContextSummary = chatViewModel::clearContextSummary,
                     onQuickPrompt = { prompt ->
                         chatViewModel.updateComposerText(prompt)
                         if (uiState.preferences.hasApiKey) {
@@ -417,12 +477,26 @@ fun ChatWorkspaceScreen(
                         }
                     },
                     onToggleSpeakMessage = chatViewModel::toggleSpeakMessage,
+                    onSwipeMessage = chatViewModel::selectMessageSwipe,
+                    onForkMessage = chatViewModel::forkConversationAtMessage,
                     onLinkClick = { url ->
                         chatViewModel.handleUrlClick(url, ::launchExternalBrowser)
                     },
                     onCopyText = { text ->
                         clipboard.setText(AnnotatedString(text))
                         chatViewModel.showSnackbar("Copied to clipboard")
+                    },
+                    onSaveCodeFile = { language, code ->
+                        val spec = CodeArtifactUtils.buildCodeExportSpec(language, code, baseName = "snippet")
+                        pendingSafExportContent = spec.code
+                        createDocumentLauncher.launch(spec.suggestedFileName to spec.mimeType)
+                    },
+                    onRunLivePreview = { language, code ->
+                        chatViewModel.openLiveArtifactPreview(language, code)
+                    },
+                    onPushCodeToGitHub = { language, code ->
+                        chatViewModel.startGitHubPushForCode(language, code)
+                        showGitHubStudio = true
                     },
                     onShareText = ::sharePlainText,
                     onToggleReaction = { msg, emoji -> chatViewModel.toggleReaction(msg, emoji) },
@@ -493,11 +567,13 @@ fun ChatWorkspaceScreen(
             )
         }
 
-        // Full-Screen Persona & SillyTavern V2 Studio Overlay
+        // Full-Screen Persona & SillyTavern V2 Studio + Shared Lorebooks Overlay
         if (showPersonaStudio) {
             PersonaStudioOverlay(
                 personas = uiState.personas,
                 activePersonaId = uiState.activeConversation?.personaId,
+                globalLorebooks = uiState.globalLorebooks,
+                enabledLorebookIds = uiState.activeConversation?.enabledLorebookIds ?: emptyList(),
                 creatorDisplayName = uiState.preferences.creatorProfile.displayName,
                 imageLoader = animatedImageLoader,
                 onClose = { showPersonaStudio = false },
@@ -508,6 +584,42 @@ fun ChatWorkspaceScreen(
                 onDeletePersona = chatViewModel::deletePersona,
                 onApplyPersona = chatViewModel::applyPersonaToActiveChat,
                 onDetachPersona = chatViewModel::detachPersonaFromActiveChat,
+                onExportPersonaV2Saf = { persona ->
+                    chatViewModel.preparePersonaV2Export(persona) { name, mime, content ->
+                        pendingSafExportContent = content
+                        createDocumentLauncher.launch(name to mime)
+                    }
+                },
+                onSharePersonaV2 = { persona ->
+                    chatViewModel.sharePersonaV2Json(persona, ::startShareIntent)
+                },
+                onSaveGlobalLorebook = chatViewModel::saveGlobalLorebook,
+                onDeleteGlobalLorebook = chatViewModel::deleteGlobalLorebook,
+                onToggleGlobalLorebook = chatViewModel::toggleGlobalLorebookForActiveChat,
+            )
+        }
+
+        // Full-Screen Side-by-Side Model Compare Arena
+        if (showModelCompare) {
+            ModelCompareOverlay(
+                compareState = uiState.compareState,
+                primaryModelId = uiState.activeConversation?.modelId ?: uiState.preferences.defaultModelId,
+                allModels = uiState.allModels,
+                onClose = { showModelCompare = false },
+                onSelectModelB = chatViewModel::setCompareModelB,
+                onRunCompare = chatViewModel::runSideBySideCompare,
+                onStopCompare = chatViewModel::stopSideBySideCompare,
+                onCommitWinner = { chooseA ->
+                    chatViewModel.commitCompareWinner(chooseA)
+                    showModelCompare = false
+                },
+                onLinkClick = { url ->
+                    chatViewModel.handleUrlClick(url, ::launchExternalBrowser)
+                },
+                onCopyText = { text ->
+                    clipboard.setText(AnnotatedString(text))
+                    chatViewModel.showSnackbar("Copied to clipboard")
+                },
             )
         }
 
@@ -535,6 +647,67 @@ fun ChatWorkspaceScreen(
                 onStopListening = chatViewModel::stopVoiceListening,
                 onSendTranscriptNow = chatViewModel::sendVoiceTranscriptNow,
                 onStopSpeaking = chatViewModel::stopSpeaking,
+            )
+        }
+
+        // Full-Screen Usage & Credits Studio Overlay
+        if (showUsageStudio) {
+            UsageAndCreditsStudioOverlay(
+                usageSnapshot = uiState.usageSnapshot,
+                activityBreakdown = uiState.activityBreakdown,
+                hasApiKey = uiState.preferences.hasApiKey,
+                hasManagementApiKey = uiState.preferences.hasManagementApiKey,
+                isLoadingUsage = uiState.isLoadingCredits,
+                isLoadingActivity = uiState.isLoadingActivity,
+                onClose = { showUsageStudio = false },
+                onRefreshAll = { chatViewModel.refreshUsageAndActivity(silent = false) },
+                onOpenSettingsForKeys = {
+                    showUsageStudio = false
+                    showVaultSheet = true
+                },
+            )
+        }
+
+        // Full-Screen GitHub Repo Browser & Commit Studio Overlay
+        if (showGitHubStudio) {
+            GitHubStudioOverlay(
+                state = uiState.gitHubState,
+                hasGitHubPat = uiState.preferences.hasGitHubPat,
+                onClose = { showGitHubStudio = false },
+                onOpenSettings = {
+                    showGitHubStudio = false
+                    showVaultSheet = true
+                },
+                onRefreshRepos = chatViewModel::refreshGitHubRepos,
+                onSelectRepo = chatViewModel::selectGitHubRepo,
+                onBackToRepos = chatViewModel::backToGitHubRepos,
+                onSelectBranch = chatViewModel::selectGitHubBranch,
+                onNavigatePath = chatViewModel::navigateGitHubPath,
+                onAttachFileToChat = { entry ->
+                    chatViewModel.attachGitHubFileToComposer(entry) {
+                        showGitHubStudio = false
+                    }
+                },
+                onPrepareCommitPreview = chatViewModel::prepareGitHubCommitPreview,
+                onConfirmCommit = chatViewModel::confirmGitHubCommit,
+                onClearCommitPreview = chatViewModel::clearGitHubCommitPreview,
+                onClearPendingPush = chatViewModel::clearGitHubPendingPush,
+                onOpenCommitUrl = { url ->
+                    chatViewModel.handleUrlClick(url, ::launchExternalBrowser)
+                },
+            )
+        }
+
+        // Full-Screen Offline-Sandboxed HTML/CSS/JS Live Artifact Preview Overlay
+        val activeArtifact = uiState.liveArtifactPreview
+        if (activeArtifact != null) {
+            LiveArtifactPreviewOverlay(
+                artifact = activeArtifact,
+                onClose = chatViewModel::dismissLiveArtifactPreview,
+                onExportHtml = { fileName, htmlContent ->
+                    pendingSafExportContent = htmlContent
+                    createDocumentLauncher.launch(fileName to "text/html")
+                },
             )
         }
 
@@ -581,6 +754,20 @@ fun ChatWorkspaceScreen(
         VaultAndPreferencesSheet(
             preferences = uiState.preferences,
             hasActiveConversation = uiState.activeConversation != null,
+            creditBalance = uiState.creditBalance,
+            usageSnapshot = uiState.usageSnapshot,
+            isLoadingCredits = uiState.isLoadingCredits,
+            onRefreshCredits = { chatViewModel.refreshCreditBalance(silent = false) },
+            onOpenUsageStudio = {
+                showUsageStudio = true
+                chatViewModel.refreshUsageAndActivity(silent = true)
+            },
+            onSaveManagementApiKey = chatViewModel::saveManagementApiKeyAndSync,
+            onSaveGitHubPat = chatViewModel::saveGitHubPatAndConnect,
+            onOpenGitHubStudio = {
+                chatViewModel.clearGitHubPendingPush()
+                showGitHubStudio = true
+            },
             onDismiss = { showVaultSheet = false },
             onSaveApiKey = chatViewModel::saveApiKeyAndSync,
             onOpenAppearanceStudio = { showAppearanceStudio = true },
@@ -621,13 +808,27 @@ fun ChatWorkspaceScreen(
         )
     }
 
-    // Live Web & Sampler Studio Sheet
+    // Live Web, Presets, Fallback Routing & Sampler Studio Sheet
     if (showWebSamplerSheet) {
         WebAndSamplerSheet(
             conversation = uiState.activeConversation,
             preferences = uiState.preferences,
+            allModels = uiState.allModels,
+            samplerPresets = uiState.samplerPresets,
+            onSaveSamplerPreset = chatViewModel::saveSamplerPreset,
+            onDeleteSamplerPreset = chatViewModel::deleteSamplerPreset,
             onDismiss = { showWebSamplerSheet = false },
             onSave = chatViewModel::updateConversationSettings,
+        )
+    }
+
+    // Custom /Slash Prompt Templates Manager Dialog
+    if (showSlashTemplatesDialog) {
+        SlashTemplatesManagerDialog(
+            templates = uiState.slashTemplates,
+            onDismiss = { showSlashTemplatesDialog = false },
+            onSaveTemplate = chatViewModel::saveSlashTemplate,
+            onDeleteTemplate = chatViewModel::deleteSlashTemplate,
         )
     }
 
@@ -682,9 +883,11 @@ private fun ChatTopHeaderBar(
     showDrawerButton: Boolean,
     onOpenDrawer: () -> Unit,
     onOpenModelPicker: () -> Unit,
+    onOpenModelCompare: () -> Unit,
     onOpenPersonaStudio: () -> Unit,
     onOpenMcpHub: () -> Unit,
     onToggleWebSearch: () -> Unit,
+    onCompressContext: () -> Unit,
     onOpenWebSampler: () -> Unit,
     onOpenVaultSettings: () -> Unit,
     onNewChat: () -> Unit,
@@ -766,10 +969,17 @@ private fun ChatTopHeaderBar(
                 }
 
                 IconButton(
+                    onClick = onOpenModelCompare,
+                    modifier = Modifier.testTag("open_model_compare_button"),
+                ) {
+                    Icon(Icons.Outlined.CompareArrows, contentDescription = "Compare two models side-by-side")
+                }
+
+                IconButton(
                     onClick = onOpenWebSampler,
                     modifier = Modifier.testTag("open_sampler_button"),
                 ) {
-                    Icon(Icons.Outlined.Tune, contentDescription = "Sampler and live web settings")
+                    Icon(Icons.Outlined.Tune, contentDescription = "Sampler, presets, fallback, and live web settings")
                 }
 
                 IconButton(
@@ -778,7 +988,7 @@ private fun ChatTopHeaderBar(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Key,
-                        contentDescription = "API key, profile, export, and settings",
+                        contentDescription = "API key, credits, profile, export, and settings",
                         tint = if (uiState.preferences.hasApiKey) {
                             MaterialTheme.colorScheme.onSurface
                         } else {
@@ -856,13 +1066,15 @@ private fun ChatTopHeaderBar(
                 }
             }
 
-            // Active Persona & Active MCP Tools Badges (when configured on current chat)
+            // Active Persona, Shared Lorebooks & MCP Tools Badges (when configured on current chat)
             val activePersona = uiState.activePersona
             val activeMcpCount = uiState.activeConversation?.enabledMcpServerIds?.size ?: 0
-            if (activePersona != null || activeMcpCount > 0) {
+            val activeLoreCount = uiState.activeConversation?.enabledLorebookIds?.size ?: 0
+            if (activePersona != null || activeMcpCount > 0 || activeLoreCount > 0) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -894,6 +1106,44 @@ private fun ChatTopHeaderBar(
                                         fontWeight = FontWeight.SemiBold,
                                     ),
                                     maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                    if (activeLoreCount > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .clickable(onClick = onOpenPersonaStudio)
+                                .testTag("active_lorebook_header_pill"),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.MenuBook,
+                                    contentDescription = "Active lorebooks",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(13.dp),
+                                )
+                                Text(
+                                    text = if (uiState.lastMatchedLorebookCount > 0) {
+                                        "Lore: $activeLoreCount (${uiState.lastMatchedLorebookCount} hit)"
+                                    } else {
+                                        "Lore: $activeLoreCount"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
@@ -925,11 +1175,26 @@ private fun ChatTopHeaderBar(
                                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                                         fontWeight = FontWeight.SemiBold,
                                     ),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
                     }
                 }
+            }
+
+            // Live Context Window Meter, Estimated Cost & One-Tap Context Compression Bar
+            if (uiState.messages.isNotEmpty() || uiState.stagedAttachments.isNotEmpty() || uiState.activePersona != null) {
+                ContextAndCostBar(
+                    metrics = uiState.contextCostMetrics,
+                    isCompressing = uiState.isCompressingContext,
+                    canCompress = uiState.contextCostMetrics.activeMessagesCount >= 6 &&
+                        !uiState.streaming.isStreaming &&
+                        uiState.preferences.hasApiKey,
+                    onCompressClick = onCompressContext,
+                )
             }
         }
     }
@@ -942,14 +1207,21 @@ private fun ChatTimelineContent(
     modifier: Modifier = Modifier,
     onOpenKeySetup: () -> Unit,
     onOpenModelPicker: () -> Unit,
+    onOpenModelCompare: () -> Unit,
     onOpenPersonaStudio: () -> Unit,
     onOpenMcpHub: () -> Unit,
     onOpenAppearanceStudio: () -> Unit,
     onOpenWebSampler: () -> Unit,
+    onClearContextSummary: () -> Unit,
     onQuickPrompt: (String) -> Unit,
     onToggleSpeakMessage: (ChatMessage) -> Unit,
+    onSwipeMessage: (ChatMessage, Int) -> Unit,
+    onForkMessage: (ChatMessage) -> Unit,
     onLinkClick: (String) -> Unit,
     onCopyText: (String) -> Unit,
+    onSaveCodeFile: (language: String, code: String) -> Unit,
+    onRunLivePreview: (language: String, code: String) -> Unit,
+    onPushCodeToGitHub: (language: String, code: String) -> Unit,
     onShareText: (String) -> Unit,
     onToggleReaction: (ChatMessage, String) -> Unit,
     onRegenerate: (ChatMessage) -> Unit,
@@ -957,6 +1229,7 @@ private fun ChatTimelineContent(
     onDelete: (ChatMessage) -> Unit,
 ) {
     val listState = rememberLazyListState()
+    val modelById = remember(uiState.allModels) { uiState.allModels.associateBy { it.id } }
 
     val timelineItems = remember(uiState.messages, uiState.clock.epochMillis) {
         buildList {
@@ -990,6 +1263,7 @@ private fun ChatTimelineContent(
             modifier = modifier,
             onOpenKeySetup = onOpenKeySetup,
             onOpenModelPicker = onOpenModelPicker,
+            onOpenModelCompare = onOpenModelCompare,
             onOpenPersonaStudio = onOpenPersonaStudio,
             onOpenMcpHub = onOpenMcpHub,
             onOpenAppearanceStudio = onOpenAppearanceStudio,
@@ -999,27 +1273,57 @@ private fun ChatTimelineContent(
         return
     }
 
+    val contextSummary = uiState.activeConversation?.contextSummary.orEmpty()
+
     LazyColumn(
         state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (contextSummary.isNotBlank()) {
+            item(key = "compressed_context_banner") {
+                CompressedContextBanner(
+                    summary = contextSummary,
+                    compressedCount = uiState.contextCostMetrics.compressedMessagesCount,
+                    onClearSummary = onClearContextSummary,
+                )
+            }
+        }
+
         items(items = timelineItems, key = { it.key }) { item ->
             when (item) {
                 is TimelineItem.DayHeader -> DayDividerHeader(label = item.label)
                 is TimelineItem.MessageRow -> {
                     val isSpeakingThis = uiState.voiceState.isSpeaking &&
                         uiState.voiceState.speakingMessageId == item.message.id
+                    val msgCost = remember(item.message, modelById, uiState.activeModel) {
+                        ContextAndCostEstimator.estimateMessageCostUsd(
+                            message = item.message,
+                            modelById = modelById,
+                            fallbackModel = uiState.activeModel,
+                        )
+                    }
                     ChatMessageItem(
                         message = item.message,
                         imageLoader = imageLoader,
                         use24HourClock = uiState.preferences.use24HourClock,
                         showTimestamps = uiState.preferences.showMessageTimestamps,
+                        estimatedCostUsd = msgCost,
                         isSpeakingThisMessage = isSpeakingThis,
                         onToggleSpeak = { onToggleSpeakMessage(item.message) },
+                        onSwipePrevious = {
+                            onSwipeMessage(item.message, item.message.activeSwipeIndex - 1)
+                        },
+                        onSwipeNext = {
+                            onSwipeMessage(item.message, item.message.activeSwipeIndex + 1)
+                        },
+                        onForkHere = { onForkMessage(item.message) },
                         onLinkClick = onLinkClick,
                         onCopyText = onCopyText,
+                        onSaveCodeFile = onSaveCodeFile,
+                        onRunLivePreview = onRunLivePreview,
+                        onPushCodeToGitHub = onPushCodeToGitHub,
                         onShareText = onShareText,
                         onToggleReaction = { emoji -> onToggleReaction(item.message, emoji) },
                         onRegenerate = { onRegenerate(item.message) },
@@ -1043,6 +1347,9 @@ private fun ChatTimelineContent(
                     citations = uiState.streaming.citations,
                     onLinkClick = onLinkClick,
                     onCopyCode = onCopyText,
+                    onSaveCodeFile = onSaveCodeFile,
+                    onRunLivePreview = onRunLivePreview,
+                    onPushCodeToGitHub = onPushCodeToGitHub,
                 )
             }
         }
@@ -1055,6 +1362,7 @@ private fun EmptyChatCanvas(
     modifier: Modifier = Modifier,
     onOpenKeySetup: () -> Unit,
     onOpenModelPicker: () -> Unit,
+    onOpenModelCompare: () -> Unit,
     onOpenPersonaStudio: () -> Unit,
     onOpenMcpHub: () -> Unit,
     onOpenAppearanceStudio: () -> Unit,
@@ -1070,7 +1378,8 @@ private fun EmptyChatCanvas(
     Box(
         modifier = modifier
             .background(bgGlow)
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 24.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -1107,71 +1416,142 @@ private fun EmptyChatCanvas(
             if (!uiState.preferences.hasApiKey) {
                 Button(
                     onClick = onOpenKeySetup,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .testTag("empty_configure_key_button"),
                 ) {
                     Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Configure Encrypted OpenRouter Key")
+                    Text(
+                        text = "Configure Encrypted OpenRouter Key",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
 
+            val pillPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 OutlinedButton(
                     onClick = onOpenModelPicker,
+                    contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 48.dp)
                         .testTag("empty_browse_models_button"),
                 ) {
-                    Text("Models")
+                    Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Models",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                OutlinedButton(
-                    onClick = onOpenAppearanceStudio,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("empty_appearance_button"),
-                ) {
-                    Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Theme")
-                }
-                OutlinedButton(
-                    onClick = onOpenWebSampler,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("empty_web_sampler_button"),
-                ) {
-                    Text("Web")
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
                 OutlinedButton(
                     onClick = onOpenPersonaStudio,
+                    contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 48.dp)
                         .testTag("empty_personas_button"),
                 ) {
                     Icon(Icons.Outlined.Face, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Personas")
+                    Text(
+                        text = "Personas",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onOpenModelCompare,
+                    contentPadding = pillPadding,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .testTag("empty_compare_button"),
+                ) {
+                    Icon(Icons.Outlined.CompareArrows, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Compare",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onOpenAppearanceStudio,
+                    contentPadding = pillPadding,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .testTag("empty_appearance_button"),
+                ) {
+                    Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Theme",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onOpenWebSampler,
+                    contentPadding = pillPadding,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .testTag("empty_web_sampler_button"),
+                ) {
+                    Icon(Icons.Outlined.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Web & Sampler",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 OutlinedButton(
                     onClick = onOpenMcpHub,
+                    contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
+                        .heightIn(min = 48.dp)
                         .testTag("empty_mcp_hub_button"),
                 ) {
                     Icon(Icons.Outlined.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("MCP Tools")
+                    Text(
+                        text = "MCP Tools",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
 

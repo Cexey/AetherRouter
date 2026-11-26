@@ -31,12 +31,15 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,10 +47,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,6 +66,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import com.example.core.ContextAndCostEstimator
+import com.example.data.model.GlobalLorebook
 import com.example.data.model.LorebookEntry
 import com.example.data.model.PersonaCard
 import java.io.File
@@ -75,6 +82,8 @@ import java.util.UUID
 fun PersonaStudioOverlay(
     personas: List<PersonaCard>,
     activePersonaId: String?,
+    globalLorebooks: List<GlobalLorebook> = emptyList(),
+    enabledLorebookIds: List<String> = emptyList(),
     creatorDisplayName: String,
     imageLoader: ImageLoader,
     onClose: () -> Unit,
@@ -83,17 +92,30 @@ fun PersonaStudioOverlay(
     onDeletePersona: (String) -> Unit,
     onApplyPersona: (PersonaCard, String?) -> Unit,
     onDetachPersona: () -> Unit,
+    onExportPersonaV2Saf: (PersonaCard) -> Unit = {},
+    onSharePersonaV2: (PersonaCard) -> Unit = {},
+    onSaveGlobalLorebook: (GlobalLorebook) -> Unit = {},
+    onDeleteGlobalLorebook: (String) -> Unit = {},
+    onToggleGlobalLorebook: (String) -> Unit = {},
 ) {
+    var selectedTab by remember { mutableIntStateOf(0) } // 0 = Personas, 1 = Shared Lorebooks
     var editingPersona by remember { mutableStateOf<PersonaCard?>(null) }
     var isCreatingNew by remember { mutableStateOf(false) }
+    var editingLorebook by remember { mutableStateOf<GlobalLorebook?>(null) }
+    var isCreatingLorebook by remember { mutableStateOf(false) }
     var greetingPickerPersona by remember { mutableStateOf<PersonaCard?>(null) }
 
     BackHandler {
-        if (editingPersona != null || isCreatingNew) {
-            editingPersona = null
-            isCreatingNew = false
-        } else {
-            onClose()
+        when {
+            editingPersona != null || isCreatingNew -> {
+                editingPersona = null
+                isCreatingNew = false
+            }
+            editingLorebook != null || isCreatingLorebook -> {
+                editingLorebook = null
+                isCreatingLorebook = false
+            }
+            else -> onClose()
         }
     }
 
@@ -115,6 +137,19 @@ fun PersonaStudioOverlay(
                     onSavePersona(saved)
                     editingPersona = null
                     isCreatingNew = false
+                },
+            )
+        } else if (editingLorebook != null || isCreatingLorebook) {
+            GlobalLorebookEditorView(
+                initial = editingLorebook,
+                onBack = {
+                    editingLorebook = null
+                    isCreatingLorebook = false
+                },
+                onSave = { saved ->
+                    onSaveGlobalLorebook(saved)
+                    editingLorebook = null
+                    isCreatingLorebook = false
                 },
             )
         } else {
@@ -150,150 +185,266 @@ fun PersonaStudioOverlay(
                         )
                     }
                     IconButton(
-                        onClick = { isCreatingNew = true },
+                        onClick = {
+                            if (selectedTab == 0) isCreatingNew = true else isCreatingLorebook = true
+                        },
                         modifier = Modifier.testTag("persona_create_new_button"),
                     ) {
-                        Icon(Icons.Outlined.Add, contentDescription = "Create new persona")
+                        Icon(Icons.Outlined.Add, contentDescription = "Create new")
                     }
                 }
 
-                // Action Row: Import SillyTavern Card + New Custom Prompt
+                // Mode Tabs: Personas vs Shared Lorebooks
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Button(
-                        onClick = onImportPersonaClick,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("persona_import_card_button"),
-                    ) {
-                        Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Import Card / File")
-                    }
-                    OutlinedButton(
-                        onClick = { isCreatingNew = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("persona_author_button"),
-                    ) {
-                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("New Persona")
-                    }
+                    FilterChip(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Face, contentDescription = null, modifier = Modifier.size(16.dp))
+                        },
+                        label = { Text("Personas (${personas.size})") },
+                        modifier = Modifier.testTag("tab_personas"),
+                    )
+                    FilterChip(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
+                        },
+                        label = {
+                            val activeCount = enabledLorebookIds.size
+                            Text(
+                                if (activeCount > 0) "Shared Lorebooks ($activeCount on)"
+                                else "Shared Lorebooks (${globalLorebooks.size})",
+                            )
+                        },
+                        modifier = Modifier.testTag("tab_shared_lorebooks"),
+                    )
                 }
 
-                Text(
-                    text = "Supports SillyTavern V1/V2 JSON, PNG character cards, and .txt / .md prompt files with Lorebook & macros.",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                )
-
-                if (activePersonaId != null) {
-                    val activeName = personas.firstOrNull { it.id == activePersonaId }?.name ?: "Active Persona"
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                if (selectedTab == 1) {
+                    // Standalone Global Shared Lorebooks Tab
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        Button(
+                            onClick = { isCreatingLorebook = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("create_shared_lorebook_button"),
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.CheckCircle,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Active in chat: $activeName",
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.SemiBold,
-                                ),
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(
-                                onClick = onDetachPersona,
-                                modifier = Modifier.testTag("persona_detach_button"),
+                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("New Shared Lorebook")
+                        }
+                    }
+                    Text(
+                        text = "Reusable worldbooks injected automatically by keyword across any persona or standalone chat.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    )
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                    if (globalLorebooks.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                Text("Detach")
+                                Icon(
+                                    imageVector = Icons.Outlined.MenuBook,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(44.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    text = "No shared lorebooks yet",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                                Text(
+                                    text = "Create reusable world info, coding standards, or project glossaries and toggle them on per chat.",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            items(items = globalLorebooks, key = { it.id }) { book ->
+                                val isActiveForChat = book.id in enabledLorebookIds
+                                GlobalLorebookRow(
+                                    book = book,
+                                    isActiveForChat = isActiveForChat,
+                                    onToggleActive = { onToggleGlobalLorebook(book.id) },
+                                    onEdit = { editingLorebook = book },
+                                    onDelete = { onDeleteGlobalLorebook(book.id) },
+                                )
                             }
                         }
                     }
-                }
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-
-                if (personas.isEmpty()) {
-                    Box(
+                } else {
+                    // Action Row: Import SillyTavern Card + New Custom Prompt
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center,
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        Button(
+                            onClick = onImportPersonaClick,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("persona_import_card_button"),
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Face,
-                                contentDescription = null,
-                                modifier = Modifier.size(44.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = "No personas in your vault yet",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                            )
-                            Text(
-                                text = "Import a SillyTavern V2 JSON/PNG card or author a custom system persona with Lorebook entries.",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                            )
+                            Icon(Icons.Outlined.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Import Card / File")
+                        }
+                        OutlinedButton(
+                            onClick = { isCreatingNew = true },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("persona_author_button"),
+                        ) {
+                            Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("New Persona")
                         }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        items(items = personas, key = { it.id }) { card ->
-                            val isActive = card.id == activePersonaId
-                            PersonaCardRow(
-                                card = card,
-                                isActive = isActive,
-                                imageLoader = imageLoader,
-                                onApply = {
-                                    val greetings = buildList {
-                                        if (card.firstMessage.isNotBlank()) add(card.firstMessage)
-                                        addAll(card.alternateGreetings.filter { it.isNotBlank() })
-                                    }
-                                    if (greetings.isNotEmpty()) {
-                                        greetingPickerPersona = card
-                                    } else {
-                                        onApplyPersona(card, null)
-                                        onClose()
-                                    }
-                                },
-                                onEdit = { editingPersona = card },
-                                onDelete = { onDeletePersona(card.id) },
-                            )
+
+                    Text(
+                        text = "Supports SillyTavern V1/V2 JSON, PNG cards, .txt/.md prompts, and full V2 JSON export.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    )
+
+                    if (activePersonaId != null) {
+                        val activeName = personas.firstOrNull { it.id == activePersonaId }?.name ?: "Active Persona"
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Active in chat: $activeName",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(
+                                    onClick = onDetachPersona,
+                                    modifier = Modifier.testTag("persona_detach_button"),
+                                ) {
+                                    Text("Detach")
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+
+                    if (personas.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Face,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(44.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    text = "No personas in your vault yet",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                                Text(
+                                    text = "Import a SillyTavern V2 JSON/PNG card or author a custom system persona with Lorebook entries.",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            items(items = personas, key = { it.id }) { card ->
+                                val isActive = card.id == activePersonaId
+                                PersonaCardRow(
+                                    card = card,
+                                    isActive = isActive,
+                                    imageLoader = imageLoader,
+                                    onApply = {
+                                        val greetings = buildList {
+                                            if (card.firstMessage.isNotBlank()) add(card.firstMessage)
+                                            addAll(card.alternateGreetings.filter { it.isNotBlank() })
+                                        }
+                                        if (greetings.isNotEmpty()) {
+                                            greetingPickerPersona = card
+                                        } else {
+                                            onApplyPersona(card, null)
+                                            onClose()
+                                        }
+                                    },
+                                    onEdit = { editingPersona = card },
+                                    onExportSaf = { onExportPersonaV2Saf(card) },
+                                    onShareV2 = { onSharePersonaV2(card) },
+                                    onDelete = { onDeletePersona(card.id) },
+                                )
+                            }
                         }
                     }
                 }
@@ -323,6 +474,8 @@ private fun PersonaCardRow(
     imageLoader: ImageLoader,
     onApply: () -> Unit,
     onEdit: () -> Unit,
+    onExportSaf: () -> Unit,
+    onShareV2: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val formatLabel = when (card.cardFormat) {
@@ -449,10 +602,16 @@ private fun PersonaCardRow(
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = onExportSaf, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Outlined.Download, contentDescription = "Save ${card.name} as V2 JSON", modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onShareV2, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Outlined.Share, contentDescription = "Share ${card.name} V2 JSON", modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
                     Icon(Icons.Outlined.Edit, contentDescription = "Edit ${card.name}", modifier = Modifier.size(18.dp))
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
                     Icon(
                         Icons.Outlined.DeleteOutline,
                         contentDescription = "Delete ${card.name}",
@@ -623,6 +782,25 @@ private fun PersonaEditorView(
             }
         }
 
+        val loreChars = remember(loreEntries) { loreEntries.sumOf { it.content.length } }
+        val (totalChars, estTokens) = remember(
+            systemPrompt,
+            description,
+            personality,
+            scenario,
+            postHistory,
+            loreChars,
+        ) {
+            ContextAndCostEstimator.estimatePersonaTokens(
+                systemPrompt = systemPrompt,
+                description = description,
+                personality = personality,
+                scenario = scenario,
+                postHistory = postHistory,
+                lorebookTotalChars = loreChars,
+            )
+        }
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -630,6 +808,30 @@ private fun PersonaEditorView(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "Prompt Footprint",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                    Text(
+                        text = "$totalChars chars • ~$estTokens tokens",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        modifier = Modifier.testTag("persona_token_counter"),
+                    )
+                }
+            }
             Text(
                 text = "Macros supported: {{char}}, {{user}} (currently \"$effectiveUser\"), {{time}}, {{date}}",
                 style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.primary),
@@ -788,6 +990,253 @@ private fun PersonaEditorView(
                 Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Add Lorebook Entry")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun GlobalLorebookRow(
+    book: GlobalLorebook,
+    isActiveForChat: Boolean,
+    onToggleActive: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val totalTokens = remember(book.entries) {
+        ContextAndCostEstimator.estimateTokens(book.entries.joinToString("\n") { it.content })
+    }
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (isActiveForChat) {
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = if (isActiveForChat) 1.5.dp else 1.dp,
+                color = if (isActiveForChat) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(16.dp),
+            ),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = book.name,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (book.description.isNotBlank()) {
+                        Text(
+                            text = book.description,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Switch(
+                    checked = isActiveForChat,
+                    onCheckedChange = { onToggleActive() },
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "${book.entries.size} entries • ~$totalTokens tok",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Outlined.Edit, contentDescription = "Edit lorebook", modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                    Icon(
+                        Icons.Outlined.DeleteOutline,
+                        contentDescription = "Delete lorebook",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GlobalLorebookEditorView(
+    initial: GlobalLorebook?,
+    onBack: () -> Unit,
+    onSave: (GlobalLorebook) -> Unit,
+) {
+    var name by remember(initial) { mutableStateOf(initial?.name.orEmpty()) }
+    var description by remember(initial) { mutableStateOf(initial?.description.orEmpty()) }
+    var entries by remember(initial) { mutableStateOf(initial?.entries ?: emptyList()) }
+    var newKeys by remember { mutableStateOf("") }
+    var newContent by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to lorebooks")
+            }
+            Text(
+                text = if (initial == null) "New Shared Lorebook" else "Edit ${initial.name}",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.weight(1f),
+            )
+            Button(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    onSave(
+                        GlobalLorebook(
+                            id = initial?.id ?: UUID.randomUUID().toString(),
+                            name = name.trim(),
+                            description = description.trim(),
+                            entries = entries,
+                            updatedAt = System.currentTimeMillis(),
+                        ),
+                    )
+                },
+                modifier = Modifier.testTag("save_shared_lorebook_button"),
+            ) {
+                Text("Save")
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Lorebook Name *") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Description") },
+                minLines = 2,
+                maxLines = 3,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(
+                text = "Keyword Entries (${entries.size})",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            )
+            entries.forEach { entry ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Keys: ${entry.keys.joinToString(", ")}",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold,
+                                ),
+                            )
+                            Text(
+                                text = entry.content,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        IconButton(
+                            onClick = { entries = entries.filterNot { it.id == entry.id } },
+                        ) {
+                            Icon(
+                                Icons.Outlined.DeleteOutline,
+                                contentDescription = "Remove entry",
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = newKeys,
+                onValueChange = { newKeys = it },
+                label = { Text("Trigger Keywords (comma-separated)") },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = newContent,
+                onValueChange = { newContent = it },
+                label = { Text("World Fact / Glossary Entry to Inject") },
+                minLines = 2,
+                maxLines = 4,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedButton(
+                enabled = newKeys.isNotBlank() && newContent.isNotBlank(),
+                onClick = {
+                    val keys = newKeys.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                    if (keys.isNotEmpty()) {
+                        entries = entries + LorebookEntry(
+                            id = UUID.randomUUID().toString(),
+                            keys = keys,
+                            content = newContent.trim(),
+                            enabled = true,
+                            insertionOrder = entries.size * 10 + 10,
+                        )
+                        newKeys = ""
+                        newContent = ""
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Add Entry")
             }
 
             Spacer(modifier = Modifier.height(20.dp))

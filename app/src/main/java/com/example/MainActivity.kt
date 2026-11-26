@@ -46,6 +46,8 @@ class MainActivity : FragmentActivity() {
 
             LaunchedEffect(lockActive) {
                 if (lockActive) {
+                    appContainer.clearSensitiveMemoryCaches()
+                    chatViewModel.wipeSensitiveMemoryState()
                     promptBiometricUnlock()
                 }
             }
@@ -93,7 +95,7 @@ class MainActivity : FragmentActivity() {
         appContainer.liveClockProvider.stop()
         if (lastBiometricEnabled) {
             isVaultUnlocked = false
-            appContainer.vaultRepository.searchIndex.clearMemoryCache()
+            appContainer.clearSensitiveMemoryCaches()
         }
     }
 

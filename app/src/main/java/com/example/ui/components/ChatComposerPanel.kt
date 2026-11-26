@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.outlined.Key
@@ -65,6 +66,8 @@ import androidx.compose.ui.unit.dp
 import coil.ImageLoader
 import com.example.data.model.ChatAttachment
 import com.example.data.model.CustomSticker
+import com.example.data.model.OpenRouterAlertState
+import com.example.data.model.SlashPromptTemplate
 import com.example.ui.theme.LiveWebActiveColor
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -77,6 +80,7 @@ fun ChatComposerPanel(
     stagedAttachments: List<ChatAttachment>,
     customStickers: List<CustomSticker>,
     smartReplies: List<String>,
+    slashTemplates: List<SlashPromptTemplate> = emptyList(),
     imageLoader: ImageLoader,
     isStreaming: Boolean,
     isProcessingAttachment: Boolean,
@@ -86,12 +90,18 @@ fun ChatComposerPanel(
     onSend: () -> Unit,
     onStop: () -> Unit,
     onSelectSmartReply: (String) -> Unit,
+    onSlashCommandAction: (SlashCommandEntry) -> Unit = {},
+    onManageSlashTemplatesClick: () -> Unit = {},
     onOpenVoiceMode: () -> Unit,
     onOpenKeySetup: () -> Unit,
     onAttachUrl: (String) -> Unit,
     onPickPhotosClick: () -> Unit,
     onPickDocumentsClick: () -> Unit,
     onOpenAttachUrlDialog: () -> Unit,
+    onBrowseGitHubClick: () -> Unit = {},
+    openRouterAlert: OpenRouterAlertState? = null,
+    onDismissAlert: () -> Unit = {},
+    onOpenUsageStudio: () -> Unit = {},
     onRemoveStagedAttachment: (String) -> Unit,
     onRichKeyboardMedia: (List<Uri>) -> Unit,
     onAttachSticker: (CustomSticker) -> Unit,
@@ -160,6 +170,14 @@ fun ChatComposerPanel(
                     .padding(horizontal = 10.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                if (openRouterAlert != null) {
+                    OpenRouterAlertBanner(
+                        alert = openRouterAlert,
+                        onDismiss = onDismissAlert,
+                        onOpenUsageStudio = onOpenUsageStudio,
+                    )
+                }
+
                 if (!hasApiKey) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -190,7 +208,28 @@ fun ChatComposerPanel(
                     }
                 }
 
-                if (smartReplies.isNotEmpty() && !isStreaming && hasApiKey) {
+                if (text.startsWith("/") && !text.contains("\n") && !isStreaming) {
+                    SlashCommandPalette(
+                        query = text,
+                        customTemplates = slashTemplates,
+                        onSelectCommand = { entry ->
+                            when (entry) {
+                                is SlashCommandEntry.CustomTemplate -> {
+                                    textFieldState.setTextAndPlaceCursorAtEnd(entry.template.promptBody)
+                                    onTextChange(entry.template.promptBody)
+                                }
+                                else -> {
+                                    textFieldState.setTextAndPlaceCursorAtEnd("")
+                                    onTextChange("")
+                                    onSlashCommandAction(entry)
+                                }
+                            }
+                        },
+                        onManageTemplatesClick = onManageSlashTemplatesClick,
+                    )
+                }
+
+                if (smartReplies.isNotEmpty() && !isStreaming && hasApiKey && !text.startsWith("/")) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -335,6 +374,16 @@ fun ChatComposerPanel(
                                     onOpenAttachUrlDialog()
                                 },
                             )
+                            DropdownMenuItem(
+                                text = { Text("Attach File from GitHub Repo") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Code, contentDescription = null)
+                                },
+                                onClick = {
+                                    showAttachMenu = false
+                                    onBrowseGitHubClick()
+                                },
+                            )
                         }
                     }
 
@@ -371,7 +420,7 @@ fun ChatComposerPanel(
                                     Box(contentAlignment = Alignment.CenterStart) {
                                         if (textFieldState.text.isEmpty()) {
                                             Text(
-                                                text = "Message, paste GIF, or attach files…",
+                                                text = "Message, type / for commands, or attach…",
                                                 style = MaterialTheme.typography.bodyLarge.copy(
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 ),

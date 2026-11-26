@@ -169,24 +169,31 @@ class PersonaCardEngine(private val context: Context) {
     }
 
     fun buildResolvedPrompt(
-        persona: PersonaCard,
+        persona: PersonaCard?,
         history: List<ChatMessage>,
         userDisplayName: String,
         clockSnapshot: LiveClockSnapshot,
         use24HourClock: Boolean,
+        extraLorebookEntries: List<LorebookEntry> = emptyList(),
     ): ResolvedPersonaPrompt {
+        val charName = persona?.name?.takeIf { it.isNotBlank() } ?: "Assistant"
         val resolve: (String) -> String = { text ->
-            resolveMacros(text, persona.name, userDisplayName, clockSnapshot, use24HourClock)
+            resolveMacros(text, charName, userDisplayName, clockSnapshot, use24HourClock)
         }
 
-        // Scan the last 6 user/assistant messages for Lorebook keyword matches
+        // Scan the last 6 user/assistant messages for Persona + Global Lorebook keyword matches
         val recentText = history
             .filter { it.role == "user" || it.role == "assistant" }
             .takeLast(6)
             .joinToString("\n") { it.content }
             .lowercase(Locale.US)
 
-        val matchedLore = persona.lorebookEntries
+        val allLore = buildList {
+            if (persona != null) addAll(persona.lorebookEntries)
+            addAll(extraLorebookEntries)
+        }
+
+        val matchedLore = allLore
             .filter { entry ->
                 entry.enabled &&
                     entry.content.isNotBlank() &&
@@ -198,21 +205,23 @@ class PersonaCardEngine(private val context: Context) {
             .sortedBy { it.insertionOrder }
 
         val systemBlock = buildString {
-            if (persona.systemPrompt.isNotBlank()) {
-                append(resolve(persona.systemPrompt))
-                append("\n\n")
-            }
-            if (persona.name.isNotBlank() && (persona.description.isNotBlank() || persona.personality.isNotBlank() || persona.scenario.isNotBlank())) {
-                append("[Persona: ${persona.name}]\n")
-            }
-            if (persona.description.isNotBlank()) {
-                append("Description: ").append(resolve(persona.description)).append("\n")
-            }
-            if (persona.personality.isNotBlank()) {
-                append("Personality: ").append(resolve(persona.personality)).append("\n")
-            }
-            if (persona.scenario.isNotBlank()) {
-                append("Scenario: ").append(resolve(persona.scenario)).append("\n")
+            if (persona != null) {
+                if (persona.systemPrompt.isNotBlank()) {
+                    append(resolve(persona.systemPrompt))
+                    append("\n\n")
+                }
+                if (persona.name.isNotBlank() && (persona.description.isNotBlank() || persona.personality.isNotBlank() || persona.scenario.isNotBlank())) {
+                    append("[Persona: ${persona.name}]\n")
+                }
+                if (persona.description.isNotBlank()) {
+                    append("Description: ").append(resolve(persona.description)).append("\n")
+                }
+                if (persona.personality.isNotBlank()) {
+                    append("Personality: ").append(resolve(persona.personality)).append("\n")
+                }
+                if (persona.scenario.isNotBlank()) {
+                    append("Scenario: ").append(resolve(persona.scenario)).append("\n")
+                }
             }
             if (matchedLore.isNotEmpty()) {
                 append("\n[Active World Info / Lorebook]\n")
@@ -222,12 +231,54 @@ class PersonaCardEngine(private val context: Context) {
             }
         }.trim()
 
-        val postHistory = resolve(persona.postHistoryInstructions).trim()
+        val postHistory = persona?.postHistoryInstructions?.let { resolve(it).trim() }.orEmpty()
         return ResolvedPersonaPrompt(
             systemBlock = systemBlock,
             postHistoryInstructions = postHistory,
             matchedLorebookCount = matchedLore.size,
         )
+    }
+
+    fun exportAsSillyTavernV2Json(persona: PersonaCard): String {
+        val entriesArr = JSONArray().apply {
+            persona.lorebookEntries.forEachIndexed { idx, entry ->
+                put(
+                    JSONObject().apply {
+                        put("id", idx)
+                        put("keys", JSONArray().apply { entry.keys.forEach { put(it) } })
+                        put("content", entry.content)
+                        put("enabled", entry.enabled)
+                        put("insertion_order", entry.insertionOrder)
+                    },
+                )
+            }
+        }
+        val dataObj = JSONObject().apply {
+            put("name", persona.name)
+            put("description", persona.description)
+            put("personality", persona.personality)
+            put("scenario", persona.scenario)
+            put("first_mes", persona.firstMessage)
+            put("alternate_greetings", JSONArray().apply { persona.alternateGreetings.forEach { put(it) } })
+            put("system_prompt", persona.systemPrompt)
+            put("post_history_instructions", persona.postHistoryInstructions)
+            put("creator_notes", persona.creatorNotes)
+            put("tags", JSONArray().apply { persona.tags.forEach { put(it) } })
+            if (persona.lorebookEntries.isNotEmpty()) {
+                put(
+                    "character_book",
+                    JSONObject().apply {
+                        put("name", "${persona.name} Lorebook")
+                        put("entries", entriesArr)
+                    },
+                )
+            }
+        }
+        return JSONObject().apply {
+            put("spec", "chara_card_v2")
+            put("spec_version", "2.0")
+            put("data", dataObj)
+        }.toString(2)
     }
 
     private fun parseLorebookEntries(book: JSONObject?): List<LorebookEntry> {

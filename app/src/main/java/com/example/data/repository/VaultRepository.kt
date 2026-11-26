@@ -7,21 +7,29 @@ import com.example.data.local.CachedModelEntity
 import com.example.data.local.ConversationEntity
 import com.example.data.local.CustomStickerEntity
 import com.example.data.local.FolderEntity
+import com.example.data.local.GlobalLorebookEntity
 import com.example.data.local.McpServerEntity
 import com.example.data.local.MessageEntity
 import com.example.data.local.PersonaCardEntity
+import com.example.data.local.SamplerPresetEntity
+import com.example.data.local.SlashPromptTemplateEntity
 import com.example.data.model.AttachmentKind
 import com.example.data.model.ChatAttachment
 import com.example.data.model.ChatMessage
 import com.example.data.model.Conversation
 import com.example.data.model.CustomSticker
 import com.example.data.model.Folder
+import com.example.data.model.GlobalLorebook
 import com.example.data.model.LorebookEntry
 import com.example.data.model.McpServerConfig
 import com.example.data.model.McpToolDef
+import com.example.data.model.MessageSwipe
 import com.example.data.model.ModelInfo
+import com.example.data.model.OpenRouterCreditBalance
 import com.example.data.model.PersonaCard
 import com.example.data.model.ReasoningEffort
+import com.example.data.model.SamplerPreset
+import com.example.data.model.SlashPromptTemplate
 import com.example.data.model.UrlCitation
 import com.example.data.model.WebSearchEngine
 import com.example.data.model.WebSearchMode
@@ -96,6 +104,9 @@ class VaultRepository(
     private val stickerDao = database.customStickerDao()
     private val personaDao = database.personaCardDao()
     private val mcpServerDao = database.mcpServerDao()
+    private val globalLorebookDao = database.globalLorebookDao()
+    private val samplerPresetDao = database.samplerPresetDao()
+    private val slashTemplateDao = database.slashPromptTemplateDao()
 
     val searchIndex = EncryptedSearchIndex()
 
@@ -179,6 +190,127 @@ class VaultRepository(
 
     suspend fun deleteMcpServer(id: String) = withContext(Dispatchers.Default) {
         mcpServerDao.deleteServerById(id)
+    }
+
+    // --- Global Lorebooks, Sampler Presets & Slash Templates ---
+
+    fun observeGlobalLorebooks(): Flow<List<GlobalLorebook>> =
+        globalLorebookDao.observeAllLorebooks()
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.Default)
+
+    suspend fun getGlobalLorebooksOnce(): List<GlobalLorebook> = withContext(Dispatchers.Default) {
+        globalLorebookDao.getAllLorebooksOnce().map { it.toDomain() }
+    }
+
+    suspend fun upsertGlobalLorebook(book: GlobalLorebook) = withContext(Dispatchers.Default) {
+        globalLorebookDao.upsertLorebook(book.copy(updatedAt = System.currentTimeMillis()).toEntity())
+    }
+
+    suspend fun deleteGlobalLorebook(id: String) = withContext(Dispatchers.Default) {
+        globalLorebookDao.deleteLorebookById(id)
+    }
+
+    fun observeSamplerPresets(): Flow<List<SamplerPreset>> =
+        samplerPresetDao.observeAllPresets()
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.Default)
+
+    suspend fun ensureStarterPresetsSeeded() = withContext(Dispatchers.Default) {
+        if (samplerPresetDao.getPresetCount() == 0) {
+            val defaults = listOf(
+                SamplerPreset(
+                    id = "preset_balanced",
+                    name = "Balanced",
+                    temperature = 0.7f,
+                    topP = 1.0f,
+                    maxTokens = 4096,
+                    reasoningEffort = ReasoningEffort.MEDIUM,
+                    isBuiltIn = true,
+                ),
+                SamplerPreset(
+                    id = "preset_creative",
+                    name = "Creative Writing",
+                    temperature = 1.15f,
+                    topP = 0.95f,
+                    maxTokens = 6144,
+                    reasoningEffort = ReasoningEffort.LOW,
+                    systemPromptSnippet = "Write with vivid imagery, strong pacing, and expressive prose.",
+                    isBuiltIn = true,
+                ),
+                SamplerPreset(
+                    id = "preset_coding",
+                    name = "Strict Coding",
+                    temperature = 0.15f,
+                    topP = 0.9f,
+                    maxTokens = 8192,
+                    reasoningEffort = ReasoningEffort.HIGH,
+                    systemPromptSnippet = "Provide clean, idiomatic, production-ready code with edge-case handling and minimal filler.",
+                    isBuiltIn = true,
+                ),
+                SamplerPreset(
+                    id = "preset_research",
+                    name = "Deep Research",
+                    temperature = 0.35f,
+                    topP = 0.95f,
+                    maxTokens = 8192,
+                    reasoningEffort = ReasoningEffort.HIGH,
+                    systemPromptSnippet = "Verify facts with live web sources, compare perspectives, and cite URLs clearly.",
+                    isBuiltIn = true,
+                ),
+            )
+            samplerPresetDao.upsertPresets(defaults.map { it.toEntity() })
+        }
+        if (slashTemplateDao.getTemplateCount() == 0) {
+            val templates = listOf(
+                SlashPromptTemplate(
+                    id = "tpl_summarize",
+                    command = "summarize",
+                    title = "Executive Summary",
+                    promptBody = "Summarize the key points above in 5 concise bullet points with action items.",
+                ),
+                SlashPromptTemplate(
+                    id = "tpl_review",
+                    command = "review",
+                    title = "Code & Bug Review",
+                    promptBody = "Review this carefully for bugs, edge cases, security issues, and concrete improvements:\n\n",
+                ),
+                SlashPromptTemplate(
+                    id = "tpl_explain",
+                    command = "eli5",
+                    title = "Explain Simply",
+                    promptBody = "Explain this clearly in plain language with a real-world analogy:\n\n",
+                ),
+                SlashPromptTemplate(
+                    id = "tpl_compare",
+                    command = "proscons",
+                    title = "Pros & Cons Table",
+                    promptBody = "Compare the options below in a clean Markdown table of pros, cons, and a clear recommendation:\n\n",
+                ),
+            )
+            slashTemplateDao.upsertTemplates(templates.map { it.toEntity() })
+        }
+    }
+
+    suspend fun upsertSamplerPreset(preset: SamplerPreset) = withContext(Dispatchers.Default) {
+        samplerPresetDao.upsertPreset(preset.toEntity())
+    }
+
+    suspend fun deleteSamplerPreset(id: String) = withContext(Dispatchers.IO) {
+        samplerPresetDao.deletePresetById(id)
+    }
+
+    fun observeSlashTemplates(): Flow<List<SlashPromptTemplate>> =
+        slashTemplateDao.observeAllTemplates()
+            .map { list -> list.map { it.toDomain() } }
+            .flowOn(Dispatchers.Default)
+
+    suspend fun upsertSlashTemplate(template: SlashPromptTemplate) = withContext(Dispatchers.Default) {
+        slashTemplateDao.upsertTemplate(template.copy(updatedAt = System.currentTimeMillis()).toEntity())
+    }
+
+    suspend fun deleteSlashTemplate(id: String) = withContext(Dispatchers.IO) {
+        slashTemplateDao.deleteTemplateById(id)
     }
 
     suspend fun upsertFolder(folder: Folder) = withContext(Dispatchers.Default) {
@@ -273,6 +405,40 @@ class VaultRepository(
         messageDao.deleteMessagesAfter(conversationId, afterEpochMillis)
     }
 
+    suspend fun clearConversationMessages(conversationId: String) = withContext(Dispatchers.IO) {
+        messageDao.deleteAllMessagesForConversation(conversationId)
+        searchIndex.removeConversation(conversationId)
+    }
+
+    suspend fun forkConversationAtMessage(
+        source: Conversation,
+        upToMessage: ChatMessage,
+    ): Conversation = withContext(Dispatchers.Default) {
+        val now = System.currentTimeMillis()
+        val forkedId = UUID.randomUUID().toString()
+        val forkedConv = source.copy(
+            id = forkedId,
+            title = "${source.title.take(38)} (Fork)",
+            isPinned = false,
+            createdAt = now,
+            updatedAt = now,
+        )
+        conversationDao.upsertConversation(forkedConv.toEntity())
+        searchIndex.putTitle(forkedConv.id, forkedConv.title)
+
+        val originalMessages = messageDao.getMessagesOnce(source.id).map { it.toDomain() }
+        val slice = originalMessages.filter { it.createdAt <= upToMessage.createdAt }
+        slice.forEach { msg ->
+            val copied = msg.copy(
+                id = UUID.randomUUID().toString(),
+                conversationId = forkedId,
+            )
+            messageDao.upsertMessage(copied.toEntity())
+            searchIndex.putMessageBody(copied.id, forkedId, copied.content)
+        }
+        forkedConv
+    }
+
     suspend fun exportFullVaultSnapshot(): ImportedVaultBundle = withContext(Dispatchers.Default) {
         val folders = folderDao.observeAllFolders().first().map { it.toDomain() }
         val convs = conversationDao.getAllConversationsOnce().map { it.toDomain() }
@@ -336,6 +502,36 @@ class VaultRepository(
         }
     }
 
+    suspend fun fetchOpenRouterCreditBalance(apiKey: String): Result<OpenRouterCreditBalance> = withContext(Dispatchers.IO) {
+        runCatching {
+            val auth = "Bearer ${apiKey.trim()}"
+            val now = System.currentTimeMillis()
+            // Primary account credits endpoint; fall back to /auth/key for provisioned/limited keys
+            val creditsAttempt = runCatching { apiService.getCredits(authorization = auth).data }.getOrNull()
+            if (creditsAttempt != null && (creditsAttempt.totalCredits != null || creditsAttempt.totalUsage != null)) {
+                val total = creditsAttempt.totalCredits
+                val used = creditsAttempt.totalUsage ?: 0.0
+                val remaining = total?.let { (it - used).coerceAtLeast(0.0) }
+                return@runCatching OpenRouterCreditBalance(
+                    totalCreditsUsd = total,
+                    totalUsageUsd = used,
+                    remainingUsd = remaining,
+                    isFreeTier = (total ?: 0.0) <= 0.0,
+                    fetchedAt = now,
+                )
+            }
+            val keyData = apiService.getAuthKey(authorization = auth).data
+                ?: throw IllegalStateException("No credit balance returned")
+            OpenRouterCreditBalance(
+                totalCreditsUsd = keyData.limit,
+                totalUsageUsd = keyData.usage ?: 0.0,
+                remainingUsd = keyData.limitRemaining,
+                isFreeTier = keyData.isFreeTier ?: false,
+                fetchedAt = now,
+            )
+        }
+    }
+
     // --- Encryption & Mapping Helpers ---
 
     private fun FolderEntity.toDomain() = Folder(
@@ -379,6 +575,10 @@ class VaultRepository(
         folderId = folderId,
         personaId = personaId,
         enabledMcpServerIds = parseStringListJson(enabledMcpServerIdsJson),
+        fallbackModelIds = parseStringListJson(fallbackModelIdsJson),
+        enabledLorebookIds = parseStringListJson(enabledLorebookIdsJson),
+        contextSummary = cryptoManager.decrypt(contextSummary),
+        summarizedUpToTimestamp = summarizedUpToTimestamp,
         title = cryptoManager.decrypt(title).ifBlank { "Untitled Chat" },
         modelId = modelId,
         systemPromptOverride = cryptoManager.decrypt(systemPromptOverride),
@@ -402,6 +602,10 @@ class VaultRepository(
         folderId = folderId,
         personaId = personaId,
         enabledMcpServerIdsJson = serializeStringListJson(enabledMcpServerIds),
+        fallbackModelIdsJson = serializeStringListJson(fallbackModelIds),
+        enabledLorebookIdsJson = serializeStringListJson(enabledLorebookIds),
+        contextSummary = cryptoManager.encrypt(contextSummary),
+        summarizedUpToTimestamp = summarizedUpToTimestamp,
         title = cryptoManager.encrypt(title),
         modelId = modelId,
         systemPromptOverride = cryptoManager.encrypt(systemPromptOverride),
@@ -573,10 +777,100 @@ class VaultRepository(
         }.getOrDefault(emptyList())
     }
 
+    private fun GlobalLorebookEntity.toDomain(): GlobalLorebook {
+        val entries = runCatching {
+            val decrypted = cryptoManager.decrypt(entriesJson)
+            val arr = JSONArray(decrypted.ifBlank { "[]" })
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    add(
+                        LorebookEntry(
+                            id = o.optString("id", UUID.randomUUID().toString()),
+                            keys = parseStringListJson(o.optJSONArray("keys")?.toString().orEmpty()),
+                            content = o.optString("content", ""),
+                            enabled = o.optBoolean("enabled", true),
+                            insertionOrder = o.optInt("insertionOrder", 100),
+                        ),
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+        return GlobalLorebook(
+            id = id,
+            name = cryptoManager.decrypt(name).ifBlank { "Shared Lorebook" },
+            description = cryptoManager.decrypt(description),
+            entries = entries,
+            updatedAt = updatedAt,
+        )
+    }
+
+    private fun GlobalLorebook.toEntity(): GlobalLorebookEntity {
+        val arr = JSONArray().apply {
+            entries.forEach { e ->
+                put(
+                    JSONObject().apply {
+                        put("id", e.id)
+                        put("keys", JSONArray().apply { e.keys.forEach { put(it) } })
+                        put("content", e.content)
+                        put("enabled", e.enabled)
+                        put("insertionOrder", e.insertionOrder)
+                    },
+                )
+            }
+        }
+        return GlobalLorebookEntity(
+            id = id,
+            name = cryptoManager.encrypt(name),
+            description = cryptoManager.encrypt(description),
+            entriesJson = cryptoManager.encrypt(arr.toString()),
+            updatedAt = updatedAt,
+        )
+    }
+
+    private fun SamplerPresetEntity.toDomain() = SamplerPreset(
+        id = id,
+        name = name,
+        temperature = temperature,
+        topP = topP,
+        maxTokens = maxTokens,
+        reasoningEffort = ReasoningEffort.fromWire(reasoningEffort),
+        systemPromptSnippet = cryptoManager.decrypt(systemPromptSnippet),
+        isBuiltIn = isBuiltIn,
+    )
+
+    private fun SamplerPreset.toEntity() = SamplerPresetEntity(
+        id = id,
+        name = name,
+        temperature = temperature,
+        topP = topP,
+        maxTokens = maxTokens,
+        reasoningEffort = reasoningEffort.wireValue,
+        systemPromptSnippet = cryptoManager.encrypt(systemPromptSnippet),
+        isBuiltIn = isBuiltIn,
+    )
+
+    private fun SlashPromptTemplateEntity.toDomain() = SlashPromptTemplate(
+        id = id,
+        command = command,
+        title = title,
+        promptBody = cryptoManager.decrypt(promptBody),
+        updatedAt = updatedAt,
+    )
+
+    private fun SlashPromptTemplate.toEntity() = SlashPromptTemplateEntity(
+        id = id,
+        command = command,
+        title = title,
+        promptBody = cryptoManager.encrypt(promptBody),
+        updatedAt = updatedAt,
+    )
+
     private fun MessageEntity.toDomain(): ChatMessage {
         val citations = parseCitationsJson(cryptoManager.decrypt(citationsJson))
         val attachments = parseAttachmentsJson(cryptoManager.decrypt(attachmentsJson))
         val reactions = parseReactionsJson(reactionsJson)
+        val swipes = parseSwipesJson(cryptoManager.decrypt(swipesJson))
         return ChatMessage(
             id = id,
             conversationId = conversationId,
@@ -593,6 +887,8 @@ class VaultRepository(
             completionTokens = completionTokens,
             toolCallsJson = cryptoManager.decrypt(toolCallsJson),
             toolCallId = toolCallId,
+            swipes = swipes,
+            activeSwipeIndex = activeSwipeIndex,
             createdAt = createdAt,
         )
     }
@@ -613,8 +909,56 @@ class VaultRepository(
         completionTokens = completionTokens,
         toolCallsJson = cryptoManager.encrypt(toolCallsJson),
         toolCallId = toolCallId,
+        swipesJson = cryptoManager.encrypt(serializeSwipesJson(swipes)),
+        activeSwipeIndex = activeSwipeIndex,
         createdAt = createdAt,
     )
+
+    private fun serializeSwipesJson(swipes: List<MessageSwipe>): String {
+        if (swipes.isEmpty()) return ""
+        val arr = JSONArray()
+        for (s in swipes) {
+            arr.put(
+                JSONObject().apply {
+                    put("content", s.content)
+                    put("reasoningContent", s.reasoningContent)
+                    put("reasoningDetailsJson", s.reasoningDetailsJson)
+                    put("thinkingDurationMs", s.thinkingDurationMs)
+                    put("citations", JSONArray(serializeCitationsJson(s.citations).ifBlank { "[]" }))
+                    put("modelUsed", s.modelUsed)
+                    put("promptTokens", s.promptTokens)
+                    put("completionTokens", s.completionTokens)
+                    put("createdAt", s.createdAt)
+                },
+            )
+        }
+        return arr.toString()
+    }
+
+    private fun parseSwipesJson(raw: String): List<MessageSwipe> {
+        if (raw.isBlank()) return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    add(
+                        MessageSwipe(
+                            content = o.optString("content", ""),
+                            reasoningContent = o.optString("reasoningContent", ""),
+                            reasoningDetailsJson = o.optString("reasoningDetailsJson", ""),
+                            thinkingDurationMs = o.optLong("thinkingDurationMs", 0L),
+                            citations = parseCitationsJson(o.optJSONArray("citations")?.toString().orEmpty()),
+                            modelUsed = o.optString("modelUsed", ""),
+                            promptTokens = o.optInt("promptTokens", 0),
+                            completionTokens = o.optInt("completionTokens", 0),
+                            createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+                        ),
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
 
     private fun CachedModelEntity.toDomain() = ModelInfo(
         id = id,

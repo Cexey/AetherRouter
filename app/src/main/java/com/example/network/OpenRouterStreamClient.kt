@@ -16,6 +16,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -186,11 +187,11 @@ class OpenRouterStreamClient(
         response.use { res ->
             if (!res.isSuccessful) {
                 val errBody = res.body?.string().orEmpty()
-                val parsedMsg = runCatching {
-                    JSONObject(errBody).optJSONObject("error")?.optString("message")
-                }.getOrNull()
-                val detail = parsedMsg?.takeIf { it.isNotBlank() } ?: errBody.take(300)
-                throw IllegalStateException("OpenRouter API error (${res.code}): $detail")
+                throw OpenRouterErrorParser.parse(
+                    httpCode = res.code,
+                    responseBody = errBody,
+                    headers = res.headers.toMap(),
+                )
             }
 
             val body = res.body ?: throw IllegalStateException("Empty response body from OpenRouter")
@@ -218,7 +219,16 @@ class OpenRouterStreamClient(
 
                     val root = runCatching { JSONObject(data) }.getOrNull() ?: continue
                     if (root.has("error") && !root.isNull("error")) {
-                        val errMsg = root.optJSONObject("error")?.optString("message")
+                        val errObj = root.optJSONObject("error")
+                        val streamCode = errObj?.optInt("code", 0) ?: 0
+                        if (streamCode == 402 || streamCode == 403 || streamCode == 429) {
+                            throw OpenRouterErrorParser.parse(
+                                httpCode = streamCode,
+                                responseBody = data,
+                                headers = res.headers.toMap(),
+                            )
+                        }
+                        val errMsg = errObj?.optString("message")
                             ?: root.optString("error")
                         throw IllegalStateException("OpenRouter stream error: $errMsg")
                     }
@@ -429,6 +439,19 @@ class OpenRouterStreamClient(
     ): JSONObject {
         val root = JSONObject()
         root.put("model", conversation.modelId)
+        if (conversation.fallbackModelIds.isNotEmpty()) {
+            val modelsArr = JSONArray()
+            modelsArr.put(conversation.modelId)
+            conversation.fallbackModelIds
+                .filter { it.isNotBlank() && it != conversation.modelId }
+                .distinct()
+                .take(4)
+                .forEach { modelsArr.put(it) }
+            if (modelsArr.length() > 1) {
+                root.put("models", modelsArr)
+                root.put("route", "fallback")
+            }
+        }
         root.put("stream", true)
         root.put("temperature", conversation.temperature.toDouble())
         root.put("top_p", conversation.topP.toDouble())
@@ -444,7 +467,7 @@ class OpenRouterStreamClient(
             )
         }
 
-        // Build messages array with real-time Android temporal grounding + project + persona + lorebook
+        // Build messages array with real-time Android temporal grounding + project + persona + lorebook + summary
         val messagesArray = JSONArray()
         val systemText = buildString {
             append(clockSnapshot.toPromptContextLine(use24HourClock))
@@ -460,6 +483,10 @@ class OpenRouterStreamClient(
                 append("\n\n")
                 append(conversation.systemPromptOverride.trim())
             }
+            if (conversation.contextSummary.isNotBlank()) {
+                append("\n\n[Conversation Memory Summary — Earlier Turns]\n")
+                append(conversation.contextSummary.trim())
+            }
         }
         messagesArray.put(
             JSONObject().apply {
@@ -468,7 +495,14 @@ class OpenRouterStreamClient(
             },
         )
 
-        for (msg in history) {
+        val cutoff = conversation.summarizedUpToTimestamp
+        val effectiveHistory = if (cutoff > 0L) {
+            history.filter { it.createdAt > cutoff }
+        } else {
+            history
+        }
+
+        for (msg in effectiveHistory) {
             val obj = JSONObject()
             obj.put("role", msg.role)
             when (msg.role) {
@@ -692,5 +726,83 @@ class OpenRouterStreamClient(
         }
 
         return root
+    }
+
+    /**
+     * Generates a concise rolling memory summary for automatic context compression.
+     */
+    suspend fun summarizeForContextCompression(
+        apiKey: String,
+        modelId: String,
+        existingSummary: String,
+        messagesToSummarize: List<ChatMessage>,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val transcript = buildString {
+                if (existingSummary.isNotBlank()) {
+                    append("Previous memory summary:\n").append(existingSummary.trim()).append("\n\n")
+                }
+                append("Newer turns to fold into memory:\n")
+                messagesToSummarize.forEach { msg ->
+                    if (msg.role == "user" || msg.role == "assistant") {
+                        append(msg.role.uppercase()).append(": ").append(msg.content.take(2_500)).append("\n\n")
+                    }
+                }
+            }
+            val payload = JSONObject().apply {
+                put("model", modelId)
+                put("stream", false)
+                put("temperature", 0.2)
+                put("max_tokens", 900)
+                put(
+                    "messages",
+                    JSONArray().apply {
+                        put(
+                            JSONObject().apply {
+                                put("role", "system")
+                                put(
+                                    "content",
+                                    "Compress the conversation history into a clear, factual bullet-point memory summary preserving key goals, decisions, names, preferences, code/technical details, and open tasks. Be concise and accurate.",
+                                )
+                            },
+                        )
+                        put(
+                            JSONObject().apply {
+                                put("role", "user")
+                                put("content", transcript)
+                            },
+                        )
+                    },
+                )
+            }
+            val request = Request.Builder()
+                .url(COMPLETIONS_URL)
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
+                .header("HTTP-Referer", "https://aetherrouter.local")
+                .header("X-Title", "AetherRouter")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            okHttpClient.newCall(request).execute().use { res ->
+                val raw = res.body?.string().orEmpty()
+                if (!res.isSuccessful) {
+                    throw OpenRouterErrorParser.parse(
+                        httpCode = res.code,
+                        responseBody = raw,
+                        headers = res.headers.toMap(),
+                    )
+                }
+                val root = JSONObject(raw)
+                val content = root.optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                    ?.optString("content")
+                    ?.trim()
+                    .orEmpty()
+                if (content.isBlank()) throw IllegalStateException("Model returned an empty summary")
+                content
+            }
+        }
     }
 }

@@ -9,7 +9,9 @@ import com.example.core.PersonaCardEngine
 import com.example.core.VoiceEngineManager
 import com.example.data.local.AetherDatabase
 import com.example.data.local.PreferencesRepository
+import com.example.data.repository.UsageRepository
 import com.example.data.repository.VaultRepository
+import com.example.network.GitHubRepository
 import com.example.network.LiveWebFetcher
 import com.example.network.McpJsonRpcClient
 import com.example.network.OpenRouterNetworkFactory
@@ -35,10 +37,22 @@ class AppContainer(context: Context) {
     val streamClient = OpenRouterStreamClient(okHttpClient, documentExtractor)
     val liveWebFetcher = LiveWebFetcher(okHttpClient)
     val mcpClient = McpJsonRpcClient(okHttpClient)
+    val usageRepository = UsageRepository(okHttpClient)
+    val gitHubRepository = GitHubRepository(okHttpClient)
 
     val vaultRepository: VaultRepository = VaultRepository(
         database = database,
         cryptoManager = cryptoManager,
         apiService = openRouterApi,
     )
+
+    /**
+     * Wipes all volatile sensitive caches (decrypted search index, usage/activity snapshots,
+     * and GitHub repo/account listings) from memory when Biometric Vault Lock engages.
+     */
+    fun clearSensitiveMemoryCaches() {
+        vaultRepository.searchIndex.clearMemoryCache()
+        usageRepository.clearMemoryCache()
+        gitHubRepository.clearMemoryCache()
+    }
 }

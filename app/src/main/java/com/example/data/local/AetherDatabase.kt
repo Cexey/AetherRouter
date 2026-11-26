@@ -16,8 +16,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         CustomStickerEntity::class,
         PersonaCardEntity::class,
         McpServerEntity::class,
+        GlobalLorebookEntity::class,
+        SamplerPresetEntity::class,
+        SlashPromptTemplateEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AetherDatabase : RoomDatabase() {
@@ -28,6 +31,9 @@ abstract class AetherDatabase : RoomDatabase() {
     abstract fun customStickerDao(): CustomStickerDao
     abstract fun personaCardDao(): PersonaCardDao
     abstract fun mcpServerDao(): McpServerDao
+    abstract fun globalLorebookDao(): GlobalLorebookDao
+    abstract fun samplerPresetDao(): SamplerPresetDao
+    abstract fun slashPromptTemplateDao(): SlashPromptTemplateDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -83,6 +89,56 @@ abstract class AetherDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `fallbackModelIdsJson` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `enabledLorebookIdsJson` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `contextSummary` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `conversations` ADD COLUMN `summarizedUpToTimestamp` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `messages` ADD COLUMN `swipesJson` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `messages` ADD COLUMN `activeSwipeIndex` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `global_lorebooks` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `entriesJson` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sampler_presets` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `temperature` REAL NOT NULL,
+                        `topP` REAL NOT NULL,
+                        `maxTokens` INTEGER NOT NULL,
+                        `reasoningEffort` TEXT NOT NULL,
+                        `systemPromptSnippet` TEXT NOT NULL,
+                        `isBuiltIn` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `slash_prompt_templates` (
+                        `id` TEXT NOT NULL,
+                        `command` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `promptBody` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AetherDatabase? = null
 
@@ -93,7 +149,7 @@ abstract class AetherDatabase : RoomDatabase() {
                     AetherDatabase::class.java,
                     "aetherrouter_vault.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration(dropAllTables = false)
                     .build()
                     .also { INSTANCE = it }

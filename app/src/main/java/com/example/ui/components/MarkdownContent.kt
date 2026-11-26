@@ -17,11 +17,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -41,7 +45,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.example.core.CodeArtifactUtils
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalAetherStyle
 
@@ -62,6 +69,9 @@ fun MarkdownContent(
     textColor: Color = MaterialTheme.colorScheme.onSurface,
     onLinkClick: (String) -> Unit = {},
     onCopyCode: (String) -> Unit = {},
+    onSaveCodeFile: ((language: String, code: String) -> Unit)? = null,
+    onRunLivePreview: ((language: String, code: String) -> Unit)? = null,
+    onPushCodeToGitHub: ((language: String, code: String) -> Unit)? = null,
 ) {
     val blocks = remember(markdown) { parseMarkdownBlocks(markdown) }
     val clipboard = LocalClipboardManager.current
@@ -92,6 +102,15 @@ fun MarkdownContent(
                                 clipboard.setText(AnnotatedString(block.code))
                                 onCopyCode(block.code)
                             },
+                            onSaveFile = onSaveCodeFile?.let { cb -> { cb(block.language, block.code) } },
+                            onRunLivePreview = if (onRunLivePreview != null &&
+                                CodeArtifactUtils.isPreviewableHtmlArtifact(block.language, block.code)
+                            ) {
+                                { onRunLivePreview(block.language, block.code) }
+                            } else {
+                                null
+                            },
+                            onPushToGitHub = onPushCodeToGitHub?.let { cb -> { cb(block.language, block.code) } },
                         )
                     }
                     is MarkdownBlock.BlockQuote -> {
@@ -168,6 +187,9 @@ private fun CodeBlockCard(
     language: String,
     code: String,
     onCopy: () -> Unit,
+    onSaveFile: (() -> Unit)? = null,
+    onRunLivePreview: (() -> Unit)? = null,
+    onPushToGitHub: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier
@@ -180,7 +202,7 @@ private fun CodeBlockCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -189,18 +211,86 @@ private fun CodeBlockCard(
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontFamily = JetBrainsMonoFontFamily,
                     color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
                 ),
             )
-            IconButton(
-                onClick = onCopy,
-                modifier = Modifier.size(36.dp),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.ContentCopy,
-                    contentDescription = "Copy code",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (onRunLivePreview != null) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable(onClick = onRunLivePreview)
+                            .testTag("code_run_live_preview_button"),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PlayArrow,
+                                contentDescription = "Run Live Preview",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Text(
+                                text = "Preview",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                            )
+                        }
+                    }
+                }
+                if (onPushToGitHub != null) {
+                    IconButton(
+                        onClick = onPushToGitHub,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("code_push_github_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.CloudUpload,
+                            contentDescription = "Push code to GitHub",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (onSaveFile != null) {
+                    IconButton(
+                        onClick = onSaveFile,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("code_save_file_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Download,
+                            contentDescription = "Save code as file",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = onCopy,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("code_copy_button"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ContentCopy,
+                        contentDescription = "Copy code",
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         Text(

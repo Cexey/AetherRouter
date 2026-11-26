@@ -27,6 +27,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.CallSplit
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
@@ -63,6 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.ImageLoader
+import com.example.core.ContextCostMetrics
 import com.example.core.LiveClockProvider
 import com.example.data.model.ChatMessage
 import com.example.data.model.UrlCitation
@@ -115,10 +119,17 @@ fun ChatMessageItem(
     imageLoader: ImageLoader,
     use24HourClock: Boolean,
     showTimestamps: Boolean,
+    estimatedCostUsd: Double = 0.0,
     isSpeakingThisMessage: Boolean = false,
     onToggleSpeak: () -> Unit = {},
+    onSwipePrevious: () -> Unit = {},
+    onSwipeNext: () -> Unit = {},
+    onForkHere: () -> Unit = {},
     onLinkClick: (String) -> Unit,
     onCopyText: (String) -> Unit,
+    onSaveCodeFile: ((language: String, code: String) -> Unit)? = null,
+    onRunLivePreview: ((language: String, code: String) -> Unit)? = null,
+    onPushCodeToGitHub: ((language: String, code: String) -> Unit)? = null,
     onShareText: (String) -> Unit,
     onToggleReaction: (String) -> Unit,
     onRegenerate: () -> Unit,
@@ -238,6 +249,19 @@ fun ChatMessageItem(
                     )
                 }
                 IconButton(
+                    onClick = onForkHere,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("user_fork_button"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CallSplit,
+                        contentDescription = "Fork conversation from this message",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(
                     onClick = onEdit,
                     modifier = Modifier
                         .size(32.dp)
@@ -319,6 +343,15 @@ fun ChatMessageItem(
                         ),
                     )
                 }
+                if (estimatedCostUsd > 0.0) {
+                    Text(
+                        text = "• ${ContextCostMetrics.formatUsd(estimatedCostUsd)}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                    )
+                }
             }
 
             // Collapsible Model Thinking Accordion
@@ -352,6 +385,9 @@ fun ChatMessageItem(
                         textColor = assistantFg,
                         onLinkClick = onLinkClick,
                         onCopyCode = { onCopyText(it) },
+                        onSaveCodeFile = onSaveCodeFile,
+                        onRunLivePreview = onRunLivePreview,
+                        onPushCodeToGitHub = onPushCodeToGitHub,
                     )
 
                     if (message.citations.isNotEmpty()) {
@@ -381,12 +417,64 @@ fun ChatMessageItem(
                 )
             }
 
-            // Response Action Bar
+            // Response Action Bar (with swipeable < 1 / N > variants & Fork Chat)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(top = 4.dp),
             ) {
+                if (message.swipes.size > 1) {
+                    val idx = message.activeSwipeIndex.coerceIn(0, message.swipes.lastIndex)
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .testTag("assistant_swipe_pill"),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 2.dp),
+                        ) {
+                            IconButton(
+                                onClick = onSwipePrevious,
+                                enabled = idx > 0,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .testTag("swipe_prev_button"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ChevronLeft,
+                                    contentDescription = "Previous generated version",
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                            Text(
+                                text = "${idx + 1}/${message.swipes.size}",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                ),
+                            )
+                            IconButton(
+                                onClick = onSwipeNext,
+                                enabled = idx < message.swipes.lastIndex,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .testTag("swipe_next_button"),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ChevronRight,
+                                    contentDescription = "Next generated version",
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
+                    }
+                }
                 IconButton(
                     onClick = { showReactionPicker = !showReactionPicker },
                     modifier = Modifier
@@ -425,7 +513,20 @@ fun ChatMessageItem(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "Regenerate response",
+                        contentDescription = "Regenerate new swipe variant",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(
+                    onClick = onForkHere,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .testTag("assistant_fork_button"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CallSplit,
+                        contentDescription = "Fork chat from here",
                         modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -499,6 +600,9 @@ fun StreamingAssistantBubble(
     citations: List<UrlCitation>,
     onLinkClick: (String) -> Unit,
     onCopyCode: (String) -> Unit,
+    onSaveCodeFile: ((language: String, code: String) -> Unit)? = null,
+    onRunLivePreview: ((language: String, code: String) -> Unit)? = null,
+    onPushCodeToGitHub: ((language: String, code: String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -567,6 +671,9 @@ fun StreamingAssistantBubble(
                             textColor = assistantFg,
                             onLinkClick = onLinkClick,
                             onCopyCode = onCopyCode,
+                            onSaveCodeFile = onSaveCodeFile,
+                            onRunLivePreview = onRunLivePreview,
+                            onPushCodeToGitHub = onPushCodeToGitHub,
                         )
                     }
                     if (citations.isNotEmpty()) {
