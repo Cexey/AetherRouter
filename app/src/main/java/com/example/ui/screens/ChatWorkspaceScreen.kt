@@ -52,7 +52,6 @@ import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
@@ -346,6 +345,14 @@ fun ChatWorkspaceScreen(
                     if (closeAfter) scope.launch { drawerState.close() }
                     showMcpHub = true
                 },
+                onOpenModelCompare = {
+                    if (closeAfter) scope.launch { drawerState.close() }
+                    showModelCompare = true
+                },
+                onOpenWebSampler = {
+                    if (closeAfter) scope.launch { drawerState.close() }
+                    showWebSamplerSheet = true
+                },
                 onOpenAppearanceStudio = {
                     if (closeAfter) scope.launch { drawerState.close() }
                     showAppearanceStudio = true
@@ -382,12 +389,10 @@ fun ChatWorkspaceScreen(
                         showDrawerButton = !isExpandedLayout,
                         onOpenDrawer = { scope.launch { drawerState.open() } },
                         onOpenModelPicker = { showModelPicker = true },
-                        onOpenModelCompare = { showModelCompare = true },
                         onOpenPersonaStudio = { showPersonaStudio = true },
                         onOpenMcpHub = { showMcpHub = true },
                         onToggleWebSearch = chatViewModel::toggleQuickWebSearch,
                         onCompressContext = chatViewModel::compressActiveConversationContext,
-                        onOpenWebSampler = { showWebSamplerSheet = true },
                         onOpenVaultSettings = { showVaultSheet = true },
                         onNewChat = chatViewModel::startNewConversation,
                     )
@@ -885,12 +890,10 @@ private fun ChatTopHeaderBar(
     showDrawerButton: Boolean,
     onOpenDrawer: () -> Unit,
     onOpenModelPicker: () -> Unit,
-    onOpenModelCompare: () -> Unit,
     onOpenPersonaStudio: () -> Unit,
     onOpenMcpHub: () -> Unit,
     onToggleWebSearch: () -> Unit,
     onCompressContext: () -> Unit,
-    onOpenWebSampler: () -> Unit,
     onOpenVaultSettings: () -> Unit,
     onNewChat: () -> Unit,
 ) {
@@ -928,12 +931,13 @@ private fun ChatTopHeaderBar(
                     }
                 }
 
-                // Prominent Model Selector Pill
+                // Widened Model Selector Pill
                 Surface(
                     shape = RoundedCornerShape(999.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     modifier = Modifier
                         .weight(1f)
+                        .padding(horizontal = 4.dp)
                         .height(42.dp)
                         .clip(RoundedCornerShape(999.dp))
                         .clickable(onClick = onOpenModelPicker)
@@ -942,7 +946,7 @@ private fun ChatTopHeaderBar(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(horizontal = 12.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp),
                     ) {
                         Box(
                             modifier = Modifier
@@ -958,6 +962,7 @@ private fun ChatTopHeaderBar(
                             text = activeModelName,
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
                         )
@@ -968,20 +973,6 @@ private fun ChatTopHeaderBar(
                             modifier = Modifier.size(18.dp),
                         )
                     }
-                }
-
-                IconButton(
-                    onClick = onOpenModelCompare,
-                    modifier = Modifier.testTag("open_model_compare_button"),
-                ) {
-                    Icon(Icons.Outlined.CompareArrows, contentDescription = "Compare two models side-by-side")
-                }
-
-                IconButton(
-                    onClick = onOpenWebSampler,
-                    modifier = Modifier.testTag("open_sampler_button"),
-                ) {
-                    Icon(Icons.Outlined.Tune, contentDescription = "Sampler, presets, fallback, and live web settings")
                 }
 
                 IconButton(

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.CompareArrows
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.DriveFileMove
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -84,6 +86,8 @@ fun ChatDrawerBody(
     onDeleteConversation: (String) -> Unit,
     onOpenPersonaStudio: () -> Unit,
     onOpenMcpHub: () -> Unit,
+    onOpenModelCompare: () -> Unit = {},
+    onOpenWebSampler: () -> Unit = {},
     onOpenAppearanceStudio: () -> Unit,
     onOpenSettings: () -> Unit,
     usageSnapshot: OpenRouterUsageSnapshot? = null,
@@ -439,6 +443,45 @@ fun ChatDrawerBody(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "MCP Tools",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onOpenModelCompare,
+                    contentPadding = drawerPillPadding,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp)
+                        .testTag("drawer_compare_button"),
+                ) {
+                    Icon(Icons.Outlined.CompareArrows, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Compare",
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onOpenWebSampler,
+                    contentPadding = drawerPillPadding,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp)
+                        .testTag("drawer_web_studio_button"),
+                ) {
+                    Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Web Studio",
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis,
