@@ -169,7 +169,25 @@ class ChatViewModel(
     private val gitHubRepository: GitHubRepository,
 ) : ViewModel() {
 
+    private data class DraftConversationConfig(
+        val modelId: String? = null,
+        val folderId: String? = null,
+        val systemPromptOverride: String = "",
+        val temperature: Float = 0.7f,
+        val topP: Float = 1.0f,
+        val maxTokens: Int = 4096,
+        val contextWindowLimit: Int = 128_000,
+        val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
+        val webSearchEnabled: Boolean? = null,
+        val webSearchMode: WebSearchMode? = null,
+        val webSearchEngine: WebSearchEngine? = null,
+        val webMaxResults: Int? = null,
+        val webMaxTotalResults: Int? = null,
+        val fallbackModelIds: List<String> = emptyList(),
+    )
+
     private val activeConversationId = MutableStateFlow<String?>(null)
+    private val draftConfig = MutableStateFlow(DraftConversationConfig())
     private val selectedFolderFilterId = MutableStateFlow<String?>(null)
     private val drawerSearchQuery = MutableStateFlow("")
     private val searchMatchingIds = MutableStateFlow<Set<String>>(emptySet())
@@ -215,7 +233,8 @@ class ChatViewModel(
         drawerSearchQuery,
         searchMatchingIds,
     ) { allConvs, folderFilter, query, matches ->
-        val byFolder = if (folderFilter == null) allConvs else allConvs.filter { it.folderId == folderFilter }
+        val nonEmpty = allConvs.filter { it.messageCount > 0 || it.isPinned || it.personaId != null }
+        val byFolder = if (folderFilter == null) nonEmpty else nonEmpty.filter { it.folderId == folderFilter }
         val bySearch = if (query.isBlank()) byFolder else byFolder.filter { it.id in matches }
         bySearch.sortedByDescending { it.isPinned }
     }
@@ -385,9 +404,13 @@ class ChatViewModel(
         viewModelScope.launch {
             vaultRepository.ensureStarterModelsSeeded()
             vaultRepository.ensureStarterPresetsSeeded()
+            vaultRepository.pruneEmptyDraftConversations()
             val existing = vaultRepository.observeConversations().first()
-            if (existing.isNotEmpty() && activeConversationId.value == null) {
-                activeConversationId.value = existing.first().id
+            if (activeConversationId.value == null) {
+                val resumable = existing.firstOrNull { it.messageCount > 0 } ?: existing.firstOrNull()
+                if (resumable != null) {
+                    activeConversationId.value = resumable.id
+                }
             }
             val savedKey = preferencesRepository.getDecryptedApiKey()
             if (savedKey.isNotBlank()) {
@@ -419,30 +442,18 @@ class ChatViewModel(
     fun selectConversation(conversationId: String) {
         if (streamingState.value.isStreaming) stopStreaming()
         activeConversationId.value = conversationId
+        openRouterAlert.value = null
+        lastMatchedLorebookCount.value = 0
     }
 
     fun startNewConversation() {
         if (streamingState.value.isStreaming) stopStreaming()
-        viewModelScope.launch {
-            val prefs = preferencesState.value
-            val folderId = selectedFolderFilterId.value
-            val folder = folderId?.let { id ->
-                vaultRepository.observeFolders().first().firstOrNull { it.id == id }
-            }
-            val modelId = folder?.defaultModelId?.takeIf { it.isNotBlank() } ?: prefs.defaultModelId
-            val created = vaultRepository.createConversation(
-                modelId = modelId,
-                folderId = folderId,
-                webSearchEnabled = prefs.defaultWebSearchEnabled,
-                webSearchMode = prefs.defaultWebSearchMode,
-                webSearchEngine = prefs.defaultWebSearchEngine,
-                webMaxResults = prefs.defaultWebMaxResults,
-                webMaxTotalResults = prefs.defaultWebMaxTotalResults,
-            )
-            activeConversationId.value = created.id
-            composerText.value = ""
-            stagedAttachments.value = emptyList()
-        }
+        activeConversationId.value = null
+        draftConfig.value = DraftConversationConfig(folderId = selectedFolderFilterId.value)
+        composerText.value = ""
+        stagedAttachments.value = emptyList()
+        openRouterAlert.value = null
+        lastMatchedLorebookCount.value = 0
     }
 
     fun deleteConversation(conversationId: String) {
@@ -450,6 +461,7 @@ class ChatViewModel(
             vaultRepository.deleteConversation(conversationId)
             if (activeConversationId.value == conversationId) {
                 val remaining = vaultRepository.observeConversations().first()
+                    .filter { it.messageCount > 0 || it.isPinned || it.personaId != null }
                 activeConversationId.value = remaining.firstOrNull()?.id
             }
             showSnackbar("Conversation deleted")
@@ -467,6 +479,11 @@ class ChatViewModel(
                         contextWindowLimit = model.contextLength.coerceAtLeast(8_192),
                     ),
                 )
+            } else {
+                draftConfig.value = draftConfig.value.copy(
+                    modelId = model.id,
+                    contextWindowLimit = model.contextLength.coerceAtLeast(8_192),
+                )
             }
             showSnackbar("Switched model to ${model.name}")
         }
@@ -474,18 +491,37 @@ class ChatViewModel(
 
     fun toggleQuickWebSearch() {
         viewModelScope.launch {
-            val current = ensureActiveConversation()
-            val nextEnabled = !current.webSearchEnabled
-            vaultRepository.updateConversation(current.copy(webSearchEnabled = nextEnabled))
-            preferencesRepository.setDefaultWebConfig(
-                enabled = nextEnabled,
-                mode = current.webSearchMode,
-                engine = current.webSearchEngine,
-                maxResults = current.webMaxResults,
-                maxTotalResults = current.webMaxTotalResults,
-            )
-            val modeLabel = if (current.webSearchMode == WebSearchMode.AGENTIC_TOOL) "Agentic" else "Always-On"
-            showSnackbar(if (nextEnabled) "Live Web enabled ($modeLabel)" else "Live Web paused")
+            val current = activeConversationId.value?.let { vaultRepository.getConversation(it) }
+            val prefs = preferencesState.value
+            if (current != null) {
+                val nextEnabled = !current.webSearchEnabled
+                vaultRepository.updateConversation(current.copy(webSearchEnabled = nextEnabled))
+                preferencesRepository.setDefaultWebConfig(
+                    enabled = nextEnabled,
+                    mode = current.webSearchMode,
+                    engine = current.webSearchEngine,
+                    maxResults = current.webMaxResults,
+                    maxTotalResults = current.webMaxTotalResults,
+                )
+                val modeLabel = if (current.webSearchMode == WebSearchMode.AGENTIC_TOOL) "Agentic" else "Always-On"
+                showSnackbar(if (nextEnabled) "Live Web enabled ($modeLabel)" else "Live Web paused")
+            } else {
+                val nextEnabled = !(draftConfig.value.webSearchEnabled ?: prefs.defaultWebSearchEnabled)
+                val mode = draftConfig.value.webSearchMode ?: prefs.defaultWebSearchMode
+                val engine = draftConfig.value.webSearchEngine ?: prefs.defaultWebSearchEngine
+                val maxRes = draftConfig.value.webMaxResults ?: prefs.defaultWebMaxResults
+                val maxTotal = draftConfig.value.webMaxTotalResults ?: prefs.defaultWebMaxTotalResults
+                draftConfig.value = draftConfig.value.copy(webSearchEnabled = nextEnabled)
+                preferencesRepository.setDefaultWebConfig(
+                    enabled = nextEnabled,
+                    mode = mode,
+                    engine = engine,
+                    maxResults = maxRes,
+                    maxTotalResults = maxTotal,
+                )
+                val modeLabel = if (mode == WebSearchMode.AGENTIC_TOOL) "Agentic" else "Always-On"
+                showSnackbar(if (nextEnabled) "Live Web enabled ($modeLabel)" else "Live Web paused")
+            }
         }
     }
 
@@ -503,9 +539,27 @@ class ChatViewModel(
         fallbackModelIds: List<String> = emptyList(),
     ) {
         viewModelScope.launch {
-            val current = ensureActiveConversation()
-            vaultRepository.updateConversation(
-                current.copy(
+            val current = activeConversationId.value?.let { vaultRepository.getConversation(it) }
+            val activeModelId = current?.modelId ?: draftConfig.value.modelId ?: preferencesState.value.defaultModelId
+            val cleanFallbacks = fallbackModelIds.filter { it.isNotBlank() && it != activeModelId }.distinct().take(4)
+            if (current != null) {
+                vaultRepository.updateConversation(
+                    current.copy(
+                        systemPromptOverride = systemPrompt.trim(),
+                        temperature = temperature.coerceIn(0f, 2f),
+                        topP = topP.coerceIn(0.05f, 1f),
+                        maxTokens = maxTokens.coerceIn(256, 65536),
+                        reasoningEffort = reasoningEffort,
+                        webSearchEnabled = webSearchEnabled,
+                        webSearchMode = webSearchMode,
+                        webSearchEngine = webSearchEngine,
+                        webMaxResults = webMaxResults.coerceIn(1, 10),
+                        webMaxTotalResults = webMaxTotalResults.coerceIn(5, 30),
+                        fallbackModelIds = cleanFallbacks,
+                    ),
+                )
+            } else {
+                draftConfig.value = draftConfig.value.copy(
                     systemPromptOverride = systemPrompt.trim(),
                     temperature = temperature.coerceIn(0f, 2f),
                     topP = topP.coerceIn(0.05f, 1f),
@@ -516,9 +570,9 @@ class ChatViewModel(
                     webSearchEngine = webSearchEngine,
                     webMaxResults = webMaxResults.coerceIn(1, 10),
                     webMaxTotalResults = webMaxTotalResults.coerceIn(5, 30),
-                    fallbackModelIds = fallbackModelIds.filter { it.isNotBlank() && it != current.modelId }.distinct().take(4),
-                ),
-            )
+                    fallbackModelIds = cleanFallbacks,
+                )
+            }
             preferencesRepository.setDefaultWebConfig(
                 enabled = webSearchEnabled,
                 mode = webSearchMode,
@@ -542,11 +596,12 @@ class ChatViewModel(
                 return@launch
             }
 
-            var conv = ensureActiveConversation()
+            val seedTitle = text.ifBlank { attachmentsToSend.firstOrNull()?.displayName.orEmpty() }
+            val autoTitle = seedTitle.replace('\n', ' ').take(48).trim().ifBlank { "New Conversation" }
+
+            var conv = ensureActiveConversation(initialTitle = autoTitle)
             val existingMessages = vaultRepository.getMessagesOnce(conv.id)
-            if (existingMessages.isEmpty() && conv.title == "New Conversation") {
-                val seedTitle = text.ifBlank { attachmentsToSend.firstOrNull()?.displayName.orEmpty() }
-                val autoTitle = seedTitle.replace('\n', ' ').take(48).trim().ifBlank { "New Conversation" }
+            if (existingMessages.isEmpty() && conv.title == "New Conversation" && autoTitle != "New Conversation") {
                 conv = conv.copy(title = autoTitle)
                 vaultRepository.updateConversation(conv)
             }
@@ -2422,25 +2477,38 @@ class ChatViewModel(
         snackbarMessage.value = null
     }
 
-    private suspend fun ensureActiveConversation(): Conversation {
+    private suspend fun ensureActiveConversation(initialTitle: String = "New Conversation"): Conversation {
         val currentId = activeConversationId.value
         if (currentId != null) {
             vaultRepository.getConversation(currentId)?.let { return it }
         }
         val prefs = preferencesState.value
-        val folderId = selectedFolderFilterId.value
+        val draft = draftConfig.value
+        val folderId = draft.folderId ?: selectedFolderFilterId.value
         val folder = folderId?.let { id ->
             vaultRepository.observeFolders().first().firstOrNull { it.id == id }
         }
+        val chosenModelId = draft.modelId
+            ?: folder?.defaultModelId?.takeIf { it.isNotBlank() }
+            ?: prefs.defaultModelId
         val created = vaultRepository.createConversation(
-            modelId = folder?.defaultModelId?.takeIf { it.isNotBlank() } ?: prefs.defaultModelId,
+            modelId = chosenModelId,
+            title = initialTitle.ifBlank { "New Conversation" },
             folderId = folderId,
-            webSearchEnabled = prefs.defaultWebSearchEnabled,
-            webSearchMode = prefs.defaultWebSearchMode,
-            webSearchEngine = prefs.defaultWebSearchEngine,
-            webMaxResults = prefs.defaultWebMaxResults,
-            webMaxTotalResults = prefs.defaultWebMaxTotalResults,
+            fallbackModelIds = draft.fallbackModelIds,
+            systemPromptOverride = draft.systemPromptOverride,
+            temperature = draft.temperature,
+            topP = draft.topP,
+            maxTokens = draft.maxTokens,
+            contextWindowLimit = draft.contextWindowLimit,
+            reasoningEffort = draft.reasoningEffort,
+            webSearchEnabled = draft.webSearchEnabled ?: prefs.defaultWebSearchEnabled,
+            webSearchMode = draft.webSearchMode ?: prefs.defaultWebSearchMode,
+            webSearchEngine = draft.webSearchEngine ?: prefs.defaultWebSearchEngine,
+            webMaxResults = draft.webMaxResults ?: prefs.defaultWebMaxResults,
+            webMaxTotalResults = draft.webMaxTotalResults ?: prefs.defaultWebMaxTotalResults,
         )
+        draftConfig.value = DraftConversationConfig()
         activeConversationId.value = created.id
         return created
     }

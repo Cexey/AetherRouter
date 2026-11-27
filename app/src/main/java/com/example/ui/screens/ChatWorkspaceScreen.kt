@@ -367,6 +367,8 @@ fun ChatWorkspaceScreen(
                     chatViewModel.clearGitHubPendingPush()
                     showGitHubStudio = true
                 },
+                use24HourClock = uiState.preferences.use24HourClock,
+                nowEpochMillis = uiState.clock.epochMillis,
             )
         }
 
@@ -1250,7 +1252,12 @@ private fun ChatTimelineContent(
         }
     }
 
-    LaunchedEffect(timelineItems.size, uiState.streaming.content.length, uiState.streaming.reasoningText.length) {
+    LaunchedEffect(
+        uiState.activeConversation?.id,
+        timelineItems.size,
+        uiState.streaming.content.length,
+        uiState.streaming.reasoningText.length,
+    ) {
         val total = timelineItems.size + if (uiState.streaming.isStreaming) 1 else 0
         if (total > 0) {
             listState.animateScrollToItem(total - 1)

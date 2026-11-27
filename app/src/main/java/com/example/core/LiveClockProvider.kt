@@ -147,6 +147,33 @@ class LiveClockProvider(private val context: Context) {
                 .format(Date(createdEpochSeconds * 1000L))
         }
 
+        fun formatHistoryTimestamp(
+            epochMillis: Long,
+            nowMillis: Long = System.currentTimeMillis(),
+            use24Hour: Boolean = false,
+        ): String {
+            if (epochMillis <= 0L) return ""
+            val diffMs = (nowMillis - epochMillis).coerceAtLeast(0L)
+            if (diffMs < 60_000L) return "Just now"
+            if (diffMs < 3_600_000L) return "${diffMs / 60_000L}m ago"
+
+            val target = Calendar.getInstance().apply { timeInMillis = epochMillis }
+            val today = Calendar.getInstance().apply { timeInMillis = nowMillis }
+            val yesterday = Calendar.getInstance().apply {
+                timeInMillis = nowMillis
+                add(Calendar.DAY_OF_YEAR, -1)
+            }
+
+            return when {
+                sameDay(target, today) -> formatMessageTimestamp(epochMillis, use24Hour)
+                sameDay(target, yesterday) -> "Yesterday"
+                target.get(Calendar.YEAR) == today.get(Calendar.YEAR) ->
+                    SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(epochMillis))
+                else ->
+                    SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(epochMillis))
+            }
+        }
+
         private fun sameDay(a: Calendar, b: Calendar): Boolean =
             a.get(Calendar.YEAR) == b.get(Calendar.YEAR) &&
                 a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)

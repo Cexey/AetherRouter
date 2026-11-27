@@ -116,10 +116,10 @@ class VaultRepository(
             .flowOn(Dispatchers.Default)
 
     fun observeConversations(): Flow<List<Conversation>> =
-        conversationDao.observeAllConversations()
-            .map { entities ->
-                entities.map { entity ->
-                    val domain = entity.toDomain()
+        conversationDao.observeAllConversationsWithCounts()
+            .map { rows ->
+                rows.map { row ->
+                    val domain = row.conversation.toDomain(messageCount = row.messageCount)
                     searchIndex.putTitle(domain.id, domain.title)
                     domain
                 }
@@ -351,7 +351,16 @@ class VaultRepository(
         modelId: String,
         title: String = "New Conversation",
         folderId: String? = null,
+        personaId: String? = null,
+        enabledMcpServerIds: List<String> = emptyList(),
+        fallbackModelIds: List<String> = emptyList(),
+        enabledLorebookIds: List<String> = emptyList(),
         systemPromptOverride: String = "",
+        temperature: Float = 0.7f,
+        topP: Float = 1.0f,
+        maxTokens: Int = 4096,
+        contextWindowLimit: Int = 128_000,
+        reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
         webSearchEnabled: Boolean = true,
         webSearchMode: WebSearchMode = WebSearchMode.AGENTIC_TOOL,
         webSearchEngine: WebSearchEngine = WebSearchEngine.AUTO,
@@ -362,9 +371,18 @@ class VaultRepository(
         val conv = Conversation(
             id = UUID.randomUUID().toString(),
             folderId = folderId,
+            personaId = personaId,
+            enabledMcpServerIds = enabledMcpServerIds,
+            fallbackModelIds = fallbackModelIds,
+            enabledLorebookIds = enabledLorebookIds,
             title = title,
             modelId = modelId,
             systemPromptOverride = systemPromptOverride,
+            temperature = temperature,
+            topP = topP,
+            maxTokens = maxTokens,
+            contextWindowLimit = contextWindowLimit,
+            reasoningEffort = reasoningEffort,
             webSearchEnabled = webSearchEnabled,
             webSearchMode = webSearchMode,
             webSearchEngine = webSearchEngine,
@@ -382,6 +400,10 @@ class VaultRepository(
         val updated = conversation.copy(updatedAt = System.currentTimeMillis())
         conversationDao.upsertConversation(updated.toEntity())
         searchIndex.putTitle(updated.id, updated.title)
+    }
+
+    suspend fun pruneEmptyDraftConversations(): Int = withContext(Dispatchers.IO) {
+        conversationDao.pruneEmptyUnpinnedConversations()
     }
 
     suspend fun deleteConversation(conversationId: String) = withContext(Dispatchers.IO) {
@@ -570,7 +592,7 @@ class VaultRepository(
         createdAt = createdAt,
     )
 
-    private fun ConversationEntity.toDomain() = Conversation(
+    private fun ConversationEntity.toDomain(messageCount: Int = 0) = Conversation(
         id = id,
         folderId = folderId,
         personaId = personaId,
@@ -593,6 +615,7 @@ class VaultRepository(
         webMaxResults = webMaxResults,
         webMaxTotalResults = webMaxTotalResults,
         isPinned = isPinned,
+        messageCount = messageCount,
         createdAt = createdAt,
         updatedAt = updatedAt,
     )

@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.core.LiveClockProvider
 import com.example.data.model.Conversation
 import com.example.data.model.Folder
 import com.example.data.model.OpenRouterUsageSnapshot
@@ -90,6 +91,8 @@ fun ChatDrawerBody(
     isLoadingUsage: Boolean = false,
     onOpenUsageStudio: () -> Unit = {},
     onOpenGitHubStudio: () -> Unit = {},
+    use24HourClock: Boolean = false,
+    nowEpochMillis: Long = System.currentTimeMillis(),
     modifier: Modifier = Modifier,
 ) {
     val folderById = remember(folders) { folders.associateBy { it.id } }
@@ -235,24 +238,41 @@ fun ChatDrawerBody(
                     val folder = conv.folderId?.let { folderById[it] }
                     var menuOpen by remember { mutableStateOf(false) }
 
+                    val lastActiveLabel = LiveClockProvider.formatHistoryTimestamp(
+                        epochMillis = conv.updatedAt,
+                        nowMillis = nowEpochMillis,
+                        use24Hour = use24HourClock,
+                    )
+                    val msgCountLabel = if (conv.messageCount == 1) {
+                        "1 msg"
+                    } else {
+                        "${conv.messageCount} msgs"
+                    }
+
                     Surface(
+                        onClick = { onSelectConversation(conv.id) },
                         shape = RoundedCornerShape(14.dp),
                         color = if (selected) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
                             MaterialTheme.colorScheme.surfaceContainerLow
                         },
+                        tonalElevation = if (selected) 2.dp else 0.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable { onSelectConversation(conv.id) },
+                            .heightIn(min = 58.dp)
+                            .testTag("drawer_conversation_item_${conv.id}"),
                     ) {
                         Row(
-                            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                            modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
                                 Row(
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
@@ -285,18 +305,41 @@ fun ChatDrawerBody(
                                             },
                                         ),
                                         maxLines = 1,
+                                        softWrap = false,
                                         overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
                                     )
+                                    if (lastActiveLabel.isNotEmpty()) {
+                                        Text(
+                                            text = lastActiveLabel,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                color = if (selected) {
+                                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                            ),
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    }
                                 }
                                 Text(
                                     text = buildString {
                                         append(conv.modelId.substringAfter('/'))
+                                        append(" • ")
+                                        append(msgCountLabel)
                                         if (folder != null) append(" • ${folder.name}")
                                     },
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (selected) {
+                                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
                                     ),
                                     maxLines = 1,
+                                    softWrap = false,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
@@ -304,7 +347,7 @@ fun ChatDrawerBody(
                             Box {
                                 IconButton(
                                     onClick = { menuOpen = true },
-                                    modifier = Modifier.size(36.dp),
+                                    modifier = Modifier.size(40.dp),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.MoreVert,

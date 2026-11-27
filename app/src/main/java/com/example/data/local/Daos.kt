@@ -1,11 +1,18 @@
 package com.example.data.local
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
+
+data class ConversationWithMessageCount(
+    @Embedded val conversation: ConversationEntity,
+    val messageCount: Int,
+)
 
 @Dao
 interface FolderDao {
@@ -24,6 +31,15 @@ interface ConversationDao {
     @Query("SELECT * FROM conversations ORDER BY isPinned DESC, updatedAt DESC")
     fun observeAllConversations(): Flow<List<ConversationEntity>>
 
+    @Query(
+        """
+        SELECT c.*, (SELECT COUNT(*) FROM messages m WHERE m.conversationId = c.id) AS messageCount
+        FROM conversations c
+        ORDER BY c.isPinned DESC, c.updatedAt DESC
+        """,
+    )
+    fun observeAllConversationsWithCounts(): Flow<List<ConversationWithMessageCount>>
+
     @Query("SELECT * FROM conversations WHERE id = :id LIMIT 1")
     fun observeConversation(id: String): Flow<ConversationEntity?>
 
@@ -33,7 +49,11 @@ interface ConversationDao {
     @Query("SELECT * FROM conversations ORDER BY isPinned DESC, updatedAt DESC")
     suspend fun getAllConversationsOnce(): List<ConversationEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * Uses Room @Upsert (INSERT, falling back to in-place UPDATE on PK conflict) instead of
+     * OnConflictStrategy.REPLACE (DELETE + INSERT), so ForeignKey.CASCADE on messages never fires.
+     */
+    @Upsert
     suspend fun upsertConversation(conversation: ConversationEntity)
 
     @Update
@@ -41,6 +61,16 @@ interface ConversationDao {
 
     @Query("DELETE FROM conversations WHERE id = :id")
     suspend fun deleteConversationById(id: String)
+
+    @Query(
+        """
+        DELETE FROM conversations
+        WHERE id NOT IN (SELECT DISTINCT conversationId FROM messages)
+          AND isPinned = 0
+          AND personaId IS NULL
+        """,
+    )
+    suspend fun pruneEmptyUnpinnedConversations(): Int
 }
 
 @Dao

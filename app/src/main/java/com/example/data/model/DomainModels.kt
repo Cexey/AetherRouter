@@ -231,6 +231,7 @@ data class Conversation(
     val webMaxResults: Int = 5,
     val webMaxTotalResults: Int = 15,
     val isPinned: Boolean = false,
+    val messageCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
 )
