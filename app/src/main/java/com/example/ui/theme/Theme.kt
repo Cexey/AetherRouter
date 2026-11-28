@@ -119,10 +119,12 @@ fun resolveFontFamily(selectedKey: String, customFontPath: String): FontFamily {
         }
     }
     return when (selectedKey) {
+        "kalam" -> KalamFontFamily
+        "plus_jakarta_sans" -> PlusJakartaSansFontFamily
         "space_grotesk" -> SpaceGroteskFontFamily
         "newsreader" -> NewsreaderFontFamily
         "jetbrains_mono" -> JetBrainsMonoFontFamily
-        else -> PlusJakartaSansFontFamily
+        else -> KalamFontFamily
     }
 }
 
@@ -188,9 +190,13 @@ fun AetherRouterTheme(
         resolveFontFamily(appearance.selectedFontKey, appearance.customFontPath)
     }
 
-    val typography = remember(bodyFontFamily, appearance.zoomScale, appearance.lineSpacingMultiplier) {
+    val typography = remember(bodyFontFamily, appearance.selectedFontKey, appearance.zoomScale, appearance.lineSpacingMultiplier) {
         buildAppTypography(
-            displayFamily = if (appearance.selectedFontKey == "custom") bodyFontFamily else SpaceGroteskFontFamily,
+            displayFamily = if (appearance.selectedFontKey == "custom" || bodyFontFamily == KalamFontFamily) {
+                bodyFontFamily
+            } else {
+                SpaceGroteskFontFamily
+            },
             bodyFamily = bodyFontFamily,
             zoomScale = appearance.zoomScale,
             lineSpacingMultiplier = appearance.lineSpacingMultiplier,

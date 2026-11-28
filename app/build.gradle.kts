@@ -16,6 +16,7 @@ android {
     applicationId = "com.aistudio.aetherrouter.vqrmkx"
     minSdk = 24
     targetSdk = 36
+    // Release version metadata aligned for GitHub Releases and Obtainium
     versionCode = 2
     versionName = "v1.0.1"
 

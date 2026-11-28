@@ -36,9 +36,16 @@ val JetBrainsMonoFontFamily = FontFamily(
     Font(R.font.jetbrains_mono, FontWeight.Bold),
 )
 
+val KalamFontFamily = FontFamily(
+    Font(R.font.kalam, FontWeight.Normal),
+    Font(R.font.kalam, FontWeight.Medium),
+    Font(R.font.kalam, FontWeight.SemiBold),
+    Font(R.font.kalam, FontWeight.Bold),
+)
+
 fun buildAppTypography(
-    displayFamily: FontFamily = SpaceGroteskFontFamily,
-    bodyFamily: FontFamily = PlusJakartaSansFontFamily,
+    displayFamily: FontFamily = KalamFontFamily,
+    bodyFamily: FontFamily = KalamFontFamily,
     zoomScale: Float = 1.0f,
     lineSpacingMultiplier: Float = 1.35f,
 ): Typography {

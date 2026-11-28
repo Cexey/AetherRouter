@@ -155,7 +155,7 @@ data class AppearanceConfig(
     val customAccentHex: String = "",
     val userBubbleHex: String = "",
     val assistantSurfaceHex: String = "",
-    val selectedFontKey: String = "plus_jakarta_sans",
+    val selectedFontKey: String = "kalam",
     val customFontPath: String = "",
     val customFontName: String = "",
     val zoomScale: Float = 1.0f,

@@ -90,6 +90,7 @@ private val SURFACE_SWATCHES = listOf(
 )
 
 private val BUNDLED_FONTS = listOf(
+    "kalam" to "Kalam Regular",
     "plus_jakarta_sans" to "Plus Jakarta Sans",
     "space_grotesk" to "Space Grotesk",
     "newsreader" to "Newsreader (Serif)",
