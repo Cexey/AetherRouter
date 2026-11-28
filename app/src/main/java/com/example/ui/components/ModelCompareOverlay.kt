@@ -98,146 +98,158 @@ fun ModelCompareOverlay(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
             // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
-                IconButton(
-                    onClick = {
-                        if (compareState.isRunning) onStopCompare()
-                        onClose()
-                    },
-                    modifier = Modifier.testTag("compare_back_button"),
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Close Model Compare")
-                }
-                Icon(
-                    imageVector = Icons.Outlined.CompareArrows,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Side-by-Side Model Compare",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    )
-                    Text(
-                        text = "Winner commits to chat; runner-up is saved as swipe #2",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                    )
-                }
-            }
-
-            // Model A vs Model B Selector Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                        Text(
-                            text = "MODEL A (ACTIVE)",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Bold,
-                            ),
-                        )
-                        Text(
-                            text = modelAName,
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.SemiBold,
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { modelBMenuOpen = true }
-                        .testTag("compare_model_b_selector"),
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                        Text(
-                            text = "MODEL B (TAP TO PICK)",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                fontWeight = FontWeight.Bold,
-                            ),
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = modelBName,
-                                style = MaterialTheme.typography.labelLarge.copy(
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    fontWeight = FontWeight.SemiBold,
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Icon(
-                                imageVector = Icons.Outlined.KeyboardArrowDown,
-                                contentDescription = "Pick comparison model",
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = modelBMenuOpen,
-                        onDismissRequest = { modelBMenuOpen = false },
+                Column(modifier = Modifier.statusBarsPadding()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        allModels.take(30).forEach { model ->
-                            DropdownMenuItem(
-                                text = {
-                                    Column {
-                                        Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(
-                                            text = "${model.company} • ${model.formattedPricing()}",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            ),
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    modelBMenuOpen = false
-                                    onSelectModelB(model.id)
-                                },
+                        IconButton(
+                            onClick = {
+                                if (compareState.isRunning) onStopCompare()
+                                onClose()
+                            },
+                            modifier = Modifier.testTag("compare_back_button"),
+                        ) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Close Model Compare")
+                        }
+                        Icon(
+                            imageVector = Icons.Outlined.CompareArrows,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Side-by-Side Model Compare",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            )
+                            Text(
+                                text = "Winner commits to chat; runner-up is saved as swipe #2",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
                             )
                         }
                     }
+
+                    // Model A vs Model B Selector Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            border = aetherCardBorder(selected = true, accent = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "MODEL A (ACTIVE)",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                )
+                                Text(
+                                    text = modelAName,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = aetherCardBorder(selected = true, accent = MaterialTheme.colorScheme.tertiary),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { modelBMenuOpen = true }
+                                .testTag("compare_model_b_selector"),
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "MODEL B (TAP TO PICK)",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.tertiary,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = modelBName,
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = FontWeight.SemiBold,
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                                        contentDescription = "Pick comparison model",
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = modelBMenuOpen,
+                                onDismissRequest = { modelBMenuOpen = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ) {
+                                allModels.take(30).forEach { model ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(model.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(
+                                                    text = "${model.company} • ${model.formattedPricing()}",
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            modelBMenuOpen = false
+                                            onSelectModelB(model.id)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
             }
 
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.padding(vertical = 6.dp),
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Responsive Adaptive Compare Panes (Side-by-Side on wide, stacked split on compact)
             BoxWithConstraints(
@@ -321,6 +333,7 @@ fun ModelCompareOverlay(
                     minLines = 1,
                     maxLines = 4,
                     shape = RoundedCornerShape(16.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier
                         .weight(1f)
                         .testTag("compare_prompt_input"),
@@ -362,11 +375,8 @@ private fun CompareLaneCard(
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.border(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-            shape = RoundedCornerShape(16.dp),
-        ),
+        border = aetherCardBorder(selected = lane.isStreaming),
+        modifier = modifier,
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
             Row(

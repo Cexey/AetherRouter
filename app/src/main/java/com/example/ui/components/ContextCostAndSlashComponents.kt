@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.core.ContextCostMetrics
 import com.example.data.model.SlashPromptTemplate
+import com.example.ui.theme.LiveWebActiveColor
 
 /**
  * Compact Live Context Window Meter, Estimated USD Cost, and one-tap Context Compression trigger.
@@ -125,7 +126,8 @@ fun ContextAndCostBar(
             if (canCompress || isCompressing) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = aetherCardBorder(),
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .clickable(enabled = !isCompressing, onClick = onCompressClick)
@@ -142,14 +144,14 @@ fun ContextAndCostBar(
                             Icon(
                                 imageVector = Icons.Outlined.Compress,
                                 contentDescription = "Compress older turns",
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(12.dp),
                             )
                         }
                         Text(
                             text = if (isCompressing) "Compressing…" else "Compress",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.SemiBold,
                             ),
                         )
@@ -184,10 +186,10 @@ fun CompressedContextBanner(
 
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = aetherCardBorder(selected = true, accent = MaterialTheme.colorScheme.tertiary),
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
             .clip(RoundedCornerShape(14.dp))
             .clickable { expanded = !expanded }
             .testTag("compressed_summary_banner"),
@@ -197,14 +199,14 @@ fun CompressedContextBanner(
                 Icon(
                     imageVector = Icons.Outlined.Compress,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Compressed Memory ($compressedCount earlier turns summarized)",
                     style = MaterialTheme.typography.labelMedium.copy(
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     modifier = Modifier.weight(1f),
@@ -212,6 +214,7 @@ fun CompressedContextBanner(
                 Icon(
                     imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
                     contentDescription = "Toggle memory summary",
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -291,11 +294,11 @@ fun SlashCommandPalette(
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = aetherCardBorder(),
+        tonalElevation = 0.dp,
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
             .testTag("slash_command_palette"),
     ) {
         Column(
@@ -322,7 +325,7 @@ fun SlashCommandPalette(
                 Text(
                     text = "+ Add Template",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.tertiary,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     modifier = Modifier
@@ -332,6 +335,14 @@ fun SlashCommandPalette(
                 )
             }
             filtered.forEach { entry ->
+                val entryTint = when (entry) {
+                    SlashCommandEntry.ToggleWeb -> LiveWebActiveColor
+                    SlashCommandEntry.CompareModels,
+                    SlashCommandEntry.OpenPersonas,
+                    is SlashCommandEntry.CustomTemplate -> MaterialTheme.colorScheme.tertiary
+                    SlashCommandEntry.ClearChat -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.primary
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -343,7 +354,7 @@ fun SlashCommandPalette(
                     Icon(
                         imageVector = entry.icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = entryTint,
                         modifier = Modifier.size(18.dp),
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -351,7 +362,7 @@ fun SlashCommandPalette(
                             Text(
                                 text = entry.command,
                                 style = MaterialTheme.typography.labelLarge.copy(
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = entryTint,
                                     fontWeight = FontWeight.Bold,
                                 ),
                             )
@@ -390,6 +401,7 @@ fun SlashTemplatesManagerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = { Text("Custom /Slash Prompt Templates") },
         text = {
             Column(
@@ -405,6 +417,7 @@ fun SlashTemplatesManagerDialog(
                     placeholder = { Text("e.g. refactor") },
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -414,6 +427,7 @@ fun SlashTemplatesManagerDialog(
                     placeholder = { Text("e.g. Refactor Cleanly") },
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -423,6 +437,7 @@ fun SlashTemplatesManagerDialog(
                     minLines = 2,
                     maxLines = 4,
                     shape = RoundedCornerShape(10.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Button(
@@ -445,34 +460,43 @@ fun SlashTemplatesManagerDialog(
                 if (templates.isNotEmpty()) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     templates.forEach { tpl ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(10.dp))
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = aetherCardBorder(),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "/${tpl.command} — ${tpl.title}",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                )
-                                Text(
-                                    text = tpl.promptBody,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    ),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            IconButton(onClick = { onDeleteTemplate(tpl.id) }, modifier = Modifier.size(32.dp)) {
-                                Icon(
-                                    Icons.Outlined.DeleteOutline,
-                                    contentDescription = "Delete template",
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(16.dp),
-                                )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "/${tpl.command} — ${tpl.title}",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            color = MaterialTheme.colorScheme.tertiary,
+                                            fontWeight = FontWeight.SemiBold,
+                                        ),
+                                    )
+                                    Text(
+                                        text = tpl.promptBody,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                IconButton(onClick = { onDeleteTemplate(tpl.id) }, modifier = Modifier.size(32.dp)) {
+                                    Icon(
+                                        Icons.Outlined.DeleteOutline,
+                                        contentDescription = "Delete template",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
                             }
                         }
                     }

@@ -87,56 +87,62 @@ fun McpToolsHubOverlay(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .navigationBarsPadding(),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier.testTag("mcp_hub_back_button"),
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Close MCP Tools Hub")
-                }
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.statusBarsPadding()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(
+                            onClick = onClose,
+                            modifier = Modifier.testTag("mcp_hub_back_button"),
+                        ) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Close MCP Tools Hub")
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "MCP Tools Hub",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            )
+                            Text(
+                                text = "${enabledServerIdsForChat.size} active in current chat • HTTP JSON-RPC 2.0",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
+                            )
+                        }
+                        Button(
+                            onClick = { editingServer = true to null },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.testTag("mcp_add_server_button"),
+                        ) {
+                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add Server")
+                        }
+                    }
+
                     Text(
-                        text = "MCP Tools Hub",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    )
-                    Text(
-                        text = "${enabledServerIdsForChat.size} active in current chat • HTTP JSON-RPC 2.0",
-                        style = MaterialTheme.typography.labelSmall.copy(
+                        text = "Connect remote HTTPS MCP tool servers. Auth headers are encrypted with AES-256-GCM on device.",
+                        style = MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         ),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(top = 6.dp),
                     )
                 }
-                Button(
-                    onClick = { editingServer = true to null },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag("mcp_add_server_button"),
-                ) {
-                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Server")
-                }
             }
-
-            Text(
-                text = "Connect remote HTTPS MCP tool servers. Auth headers are encrypted with AES-256-GCM on device.",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant,
-                modifier = Modifier.padding(top = 6.dp),
-            )
 
             if (servers.isEmpty()) {
                 Box(
@@ -154,7 +160,7 @@ fun McpToolsHubOverlay(
                             imageVector = Icons.Outlined.Extension,
                             contentDescription = null,
                             modifier = Modifier.size(44.dp),
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.tertiary,
                         )
                         Text(
                             text = "No MCP servers connected",
@@ -250,7 +256,7 @@ private fun McpServerCard(
                             Icon(
                                 imageVector = Icons.Outlined.Lock,
                                 contentDescription = "Encrypted auth header configured",
-                                tint = MaterialTheme.colorScheme.secondary,
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(14.dp),
                             )
                         }
@@ -287,13 +293,20 @@ private fun McpServerCard(
                 OutlinedButton(
                     onClick = onSync,
                     enabled = !isSyncing,
+                    colors = aetherSlateButtonColors(),
+                    border = aetherCardBorder(),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.testTag("mcp_sync_tools_button"),
                 ) {
                     if (isSyncing) {
                         CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                     } else {
-                        Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.Refresh,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(if (isSyncing) "Syncing…" else "Sync Tools (${server.tools.size})")
@@ -371,6 +384,7 @@ private fun McpServerFormDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = { Text(if (existing == null) "Connect MCP Server" else "Edit MCP Server") },
         text = {
             Column(
@@ -386,6 +400,7 @@ private fun McpServerFormDialog(
                     placeholder = { Text("e.g. GitHub MCP, Docs Search") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("mcp_name_input"),
@@ -397,6 +412,7 @@ private fun McpServerFormDialog(
                     placeholder = { Text("https://mcp.example.com/rpc") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("mcp_url_input"),
@@ -407,6 +423,7 @@ private fun McpServerFormDialog(
                     label = { Text("Auth Header Name (optional)") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -425,6 +442,7 @@ private fun McpServerFormDialog(
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

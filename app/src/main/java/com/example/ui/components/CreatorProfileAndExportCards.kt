@@ -66,7 +66,8 @@ fun CreatorProfileCard(
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = aetherCardBorder(),
         modifier = modifier
             .fillMaxWidth()
             .testTag("creator_profile_card"),
@@ -87,7 +88,7 @@ fun CreatorProfileCard(
                     Icon(
                         imageVector = Icons.Outlined.Person,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(20.dp),
                     )
                     Text(
@@ -253,6 +254,8 @@ fun CreatorProfileCard(
                 ) {
                     OutlinedButton(
                         onClick = { isEditing = false },
+                        colors = aetherSlateButtonColors(),
+                        border = aetherCardBorder(),
                         modifier = Modifier.weight(1f),
                     ) {
                         Text("Cancel")
@@ -298,7 +301,8 @@ fun ExportAndBackupCard(
 
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = aetherCardBorder(),
         modifier = modifier
             .fillMaxWidth()
             .testTag("export_backup_card"),
@@ -314,7 +318,7 @@ fun ExportAndBackupCard(
                 Icon(
                     imageVector = Icons.Outlined.CloudUpload,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
@@ -353,6 +357,8 @@ fun ExportAndBackupCard(
                     OutlinedButton(
                         onClick = { onExportChatSaf(format) },
                         enabled = hasActiveConversation,
+                        colors = aetherSlateButtonColors(),
+                        border = aetherCardBorder(),
                         modifier = Modifier.testTag("export_saf_${format.extension}"),
                     ) {
                         Text("Save")
@@ -360,9 +366,16 @@ fun ExportAndBackupCard(
                     OutlinedButton(
                         onClick = { onShareChatFile(format) },
                         enabled = hasActiveConversation,
+                        colors = aetherSlateButtonColors(),
+                        border = aetherCardBorder(),
                         modifier = Modifier.testTag("share_file_${format.extension}"),
                     ) {
-                        Icon(Icons.Outlined.Share, contentDescription = "Share", modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.Share,
+                            contentDescription = "Share",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                 }
             }
@@ -375,7 +388,7 @@ fun ExportAndBackupCard(
                 Icon(
                     imageVector = Icons.Outlined.Lock,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(16.dp),
                 )
                 Text(
@@ -391,6 +404,7 @@ fun ExportAndBackupCard(
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 shape = RoundedCornerShape(12.dp),
+                colors = aetherTextFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("vault_passphrase_input"),
@@ -410,19 +424,33 @@ fun ExportAndBackupCard(
                 }
                 OutlinedButton(
                     onClick = { onShareVaultFile(vaultPassphrase) },
+                    colors = aetherSlateButtonColors(),
+                    border = aetherCardBorder(),
                     modifier = Modifier.testTag("share_vault_button"),
                 ) {
-                    Icon(Icons.Outlined.Share, contentDescription = "Share vault backup", modifier = Modifier.size(18.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Share,
+                        contentDescription = "Share vault backup",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
 
             OutlinedButton(
                 onClick = { onImportBackupSaf(vaultPassphrase) },
+                colors = aetherSlateButtonColors(),
+                border = aetherCardBorder(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("import_vault_saf_button"),
             ) {
-                Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(
+                    imageVector = Icons.Outlined.FileDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(18.dp),
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Import .orvault or .json Backup")
             }

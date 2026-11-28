@@ -117,8 +117,8 @@ fun ModelPickerOverlay(
         Column(modifier = Modifier.fillMaxSize()) {
             // Sticky Expressive Header & Controls
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 3.dp,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
                 Column(
                     modifier = Modifier
@@ -183,6 +183,7 @@ fun ModelPickerOverlay(
                             Icon(
                                 imageVector = Icons.Outlined.Search,
                                 contentDescription = "Search models",
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         },
                         trailingIcon = {
@@ -203,6 +204,7 @@ fun ModelPickerOverlay(
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(16.dp),
+                        colors = aetherTextFieldColors(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("model_picker_search_input"),
@@ -243,7 +245,8 @@ fun ModelPickerOverlay(
                         )
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = aetherCardBorder(),
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(RoundedCornerShape(12.dp))
@@ -258,7 +261,7 @@ fun ModelPickerOverlay(
                                         Icons.Outlined.ArrowDownward
                                     },
                                     contentDescription = if (memory.sortAscending) "Ascending" else "Descending",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    tint = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -276,11 +279,14 @@ fun ModelPickerOverlay(
                         FilterChip(
                             selected = memory.filterFavorites,
                             onClick = onToggleFavFilter,
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(selected = memory.filterFavorites),
                             label = { Text("Favorites") },
                             leadingIcon = {
                                 Icon(
                                     imageVector = if (memory.filterFavorites) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                     contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.size(16.dp),
                                 )
                             },
@@ -288,30 +294,53 @@ fun ModelPickerOverlay(
                         FilterChip(
                             selected = memory.filterReasoning,
                             onClick = onToggleReasoningFilter,
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(selected = memory.filterReasoning),
                             label = { Text("Reasoning") },
                             leadingIcon = {
-                                Icon(Icons.Outlined.Psychology, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    imageVector = Icons.Outlined.Psychology,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(16.dp),
+                                )
                             },
                         )
                         FilterChip(
                             selected = memory.filterVision,
                             onClick = onToggleVisionFilter,
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(selected = memory.filterVision),
                             label = { Text("Vision") },
                             leadingIcon = {
-                                Icon(Icons.Outlined.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    imageVector = Icons.Outlined.Visibility,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp),
+                                )
                             },
                         )
                         FilterChip(
                             selected = memory.filterTools,
                             onClick = onToggleToolsFilter,
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(selected = memory.filterTools),
                             label = { Text("Tools") },
                             leadingIcon = {
-                                Icon(Icons.Outlined.Build, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    imageVector = Icons.Outlined.Build,
+                                    contentDescription = null,
+                                    tint = LiveWebActiveColor,
+                                    modifier = Modifier.size(16.dp),
+                                )
                             },
                         )
                         FilterChip(
                             selected = memory.filterFree,
                             onClick = onToggleFreeFilter,
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(selected = memory.filterFree),
                             label = { Text("Free") },
                         )
                         if (hasActiveFilter) {
@@ -339,6 +368,8 @@ fun ModelPickerOverlay(
                                 FilterChip(
                                     selected = selected,
                                     onClick = { onSelectCompany(company) },
+                                    colors = aetherFilterChipColors(),
+                                    border = aetherFilterChipBorder(selected = selected),
                                     label = { Text(company) },
                                 )
                             }
@@ -471,7 +502,8 @@ private fun StatefulModelList(
                         )
                         Surface(
                             shape = RoundedCornerShape(999.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = aetherCardBorder(),
                         ) {
                             Text(
                                 text = "${row.count}",
@@ -506,18 +538,18 @@ private fun HighVisibilityModelCard(
     val borderColor = if (isSelected) {
         MaterialTheme.colorScheme.primary
     } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+        MaterialTheme.colorScheme.outlineVariant
     }
 
     Surface(
         shape = RoundedCornerShape(18.dp),
         color = if (isSelected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
         } else {
             MaterialTheme.colorScheme.surfaceContainerLow
         },
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
-        tonalElevation = if (isSelected) 3.dp else 1.dp,
+        border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, borderColor),
+        tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
@@ -540,12 +572,13 @@ private fun HighVisibilityModelCard(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = aetherCardBorder(),
                         ) {
                             Text(
                                 text = model.company,
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold,
                                 ),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),

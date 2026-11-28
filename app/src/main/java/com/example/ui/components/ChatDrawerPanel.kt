@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -101,9 +102,13 @@ fun ChatDrawerBody(
 ) {
     val folderById = remember(folders) { folders.associateBy { it.id } }
 
+    val cobaltAccent = MaterialTheme.colorScheme.primary
+    val goldAccent = MaterialTheme.colorScheme.tertiary
+
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(aetherSubtleAuraBrush(alpha = 0.14f))
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(14.dp),
@@ -114,22 +119,58 @@ fun ChatDrawerBody(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(
-                text = "AetherRouter",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            )
-            Row {
-                IconButton(
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AetherCrystalEmblem(
+                    size = 34.dp,
+                    cornerRadius = 10.dp,
+                    showHalo = false,
+                    contentDescription = "AetherRouter",
+                    modifier = Modifier.testTag("drawer_header_logo"),
+                )
+                Text(
+                    text = "AetherRouter",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Surface(
                     onClick = onCreateFolderClick,
-                    modifier = Modifier.testTag("drawer_new_project_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = aetherCardBorder(),
+                    modifier = Modifier
+                        .size(40.dp)
+                        .testTag("drawer_new_project_button"),
                 ) {
-                    Icon(Icons.Outlined.CreateNewFolder, contentDescription = "New project folder")
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.CreateNewFolder,
+                            contentDescription = "New project folder",
+                            tint = goldAccent,
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
                 }
-                IconButton(
+                Surface(
                     onClick = onNewChat,
-                    modifier = Modifier.testTag("drawer_new_chat_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = aetherCardBorder(),
+                    modifier = Modifier
+                        .size(40.dp)
+                        .testTag("drawer_new_chat_button"),
                 ) {
-                    Icon(Icons.Outlined.Add, contentDescription = "Start new conversation")
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Outlined.Add,
+                            contentDescription = "Start new conversation",
+                            tint = cobaltAccent,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
         }
@@ -148,7 +189,13 @@ fun ChatDrawerBody(
             value = searchQuery,
             onValueChange = onSearchChange,
             placeholder = { Text("Search encrypted chats…") },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null,
+                    tint = cobaltAccent,
+                )
+            },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { onSearchChange("") }) {
@@ -158,6 +205,7 @@ fun ChatDrawerBody(
             },
             singleLine = true,
             shape = RoundedCornerShape(14.dp),
+            colors = aetherTextFieldColors(),
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("drawer_encrypted_search_input"),
@@ -171,17 +219,23 @@ fun ChatDrawerBody(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val allSelected = selectedFolderFilterId == null
             FilterChip(
-                selected = selectedFolderFilterId == null,
+                selected = allSelected,
                 onClick = { onSelectFolderFilter(null) },
+                colors = aetherFilterChipColors(),
+                border = aetherFilterChipBorder(selected = allSelected),
                 label = { Text("All Chats") },
                 modifier = Modifier.testTag("folder_filter_all"),
             )
             folders.forEach { folder ->
+                val isSelected = selectedFolderFilterId == folder.id
                 val dotColor = parseHexColorOrNull(folder.colorHex) ?: MaterialTheme.colorScheme.primary
                 FilterChip(
-                    selected = selectedFolderFilterId == folder.id,
+                    selected = isSelected,
                     onClick = { onSelectFolderFilter(folder.id) },
+                    colors = aetherFilterChipColors(),
+                    border = aetherFilterChipBorder(selected = isSelected),
                     leadingIcon = {
                         Box(
                             modifier = Modifier
@@ -261,7 +315,8 @@ fun ChatDrawerBody(
                         } else {
                             MaterialTheme.colorScheme.surfaceContainerLow
                         },
-                        tonalElevation = if (selected) 2.dp else 0.dp,
+                        border = aetherCardBorder(selected = selected),
+                        tonalElevation = 0.dp,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 58.dp)
@@ -284,7 +339,7 @@ fun ChatDrawerBody(
                                         Icon(
                                             imageVector = Icons.Outlined.PushPin,
                                             contentDescription = "Pinned",
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = goldAccent,
                                             modifier = Modifier.size(13.dp),
                                         )
                                     }
@@ -410,19 +465,29 @@ fun ChatDrawerBody(
 
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             val drawerPillPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+            val pillColors = aetherSlateButtonColors()
+            val pillBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedButton(
                     onClick = onOpenPersonaStudio,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
                         .testTag("drawer_personas_button"),
                 ) {
-                    Icon(Icons.Outlined.Face, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Face,
+                        contentDescription = null,
+                        tint = goldAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Personas",
@@ -433,13 +498,20 @@ fun ChatDrawerBody(
                 }
                 OutlinedButton(
                     onClick = onOpenMcpHub,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
                         .testTag("drawer_mcp_hub_button"),
                 ) {
-                    Icon(Icons.Outlined.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Extension,
+                        contentDescription = null,
+                        tint = cobaltAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "MCP Tools",
@@ -455,13 +527,20 @@ fun ChatDrawerBody(
             ) {
                 OutlinedButton(
                     onClick = onOpenModelCompare,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
                         .testTag("drawer_compare_button"),
                 ) {
-                    Icon(Icons.Outlined.CompareArrows, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.CompareArrows,
+                        contentDescription = null,
+                        tint = cobaltAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Compare",
@@ -472,13 +551,20 @@ fun ChatDrawerBody(
                 }
                 OutlinedButton(
                     onClick = onOpenWebSampler,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
                         .testTag("drawer_web_studio_button"),
                 ) {
-                    Icon(Icons.Outlined.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = null,
+                        tint = goldAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Web Studio",
@@ -494,13 +580,20 @@ fun ChatDrawerBody(
             ) {
                 OutlinedButton(
                     onClick = onOpenAppearanceStudio,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
                         .testTag("drawer_appearance_button"),
                 ) {
-                    Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Palette,
+                        contentDescription = null,
+                        tint = goldAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Theme",
@@ -511,13 +604,20 @@ fun ChatDrawerBody(
                 }
                 OutlinedButton(
                     onClick = onOpenSettings,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = drawerPillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 44.dp)
                         .testTag("drawer_settings_button"),
                 ) {
-                    Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Key,
+                        contentDescription = null,
+                        tint = cobaltAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Settings",
@@ -529,13 +629,20 @@ fun ChatDrawerBody(
             }
             OutlinedButton(
                 onClick = onOpenGitHubStudio,
+                colors = pillColors,
+                border = pillBorder,
                 contentPadding = drawerPillPadding,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 44.dp)
                     .testTag("drawer_github_studio_button"),
             ) {
-                Icon(Icons.Outlined.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(
+                    imageVector = Icons.Outlined.Code,
+                    contentDescription = null,
+                    tint = cobaltAccent,
+                    modifier = Modifier.size(16.dp),
+                )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "GitHub Repo Studio",

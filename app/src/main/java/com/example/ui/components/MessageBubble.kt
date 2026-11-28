@@ -7,6 +7,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -94,7 +95,8 @@ fun DayDividerHeader(
         )
         Surface(
             shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = aetherCardBorder(),
             modifier = Modifier.padding(horizontal = 12.dp),
         ) {
             Text(
@@ -171,7 +173,8 @@ fun ChatMessageItem(
                     bottomEnd = (radius.value * 0.35f).coerceAtLeast(4f).dp,
                 ),
                 color = userBg,
-                tonalElevation = 2.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)),
+                tonalElevation = 0.dp,
                 modifier = Modifier.widthIn(max = 330.dp),
             ) {
                 Column(
@@ -369,7 +372,8 @@ fun ChatMessageItem(
             Surface(
                 shape = RoundedCornerShape(radius),
                 color = assistantBg,
-                tonalElevation = 1.dp,
+                border = aetherCardBorder(),
+                tonalElevation = 0.dp,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(horizontal = bubblePadH, vertical = bubblePadV)) {
@@ -430,7 +434,8 @@ fun ChatMessageItem(
                     val idx = message.activeSwipeIndex.coerceIn(0, message.swipes.lastIndex)
                     Surface(
                         shape = RoundedCornerShape(999.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = aetherCardBorder(selected = true, accent = MaterialTheme.colorScheme.tertiary),
                         modifier = Modifier
                             .padding(end = 4.dp)
                             .testTag("assistant_swipe_pill"),
@@ -455,7 +460,7 @@ fun ChatMessageItem(
                             Text(
                                 text = "${idx + 1}/${message.swipes.size}",
                                 style = MaterialTheme.typography.labelSmall.copy(
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.Bold,
                                 ),
                             )
@@ -662,6 +667,7 @@ fun StreamingAssistantBubble(
             Surface(
                 shape = RoundedCornerShape(style.bubbleCornerRadiusDp),
                 color = assistantBg,
+                border = aetherCardBorder(selected = true),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {

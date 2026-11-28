@@ -2,39 +2,40 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Expressive Midnight Obsidian & Cobalt-Indigo Dark Palette
-val CobaltPrimaryDark = Color(0xFF8AA4FF)
-val OnCobaltPrimaryDark = Color(0xFF0A1D5E)
-val CobaltContainerDark = Color(0xFF1F327A)
-val OnCobaltContainerDark = Color(0xFFDBE2FF)
+// Nocturnal Obsidian, Crystal Cobalt & Warm Brushed Gold Dark Palette
+val CobaltPrimaryDark = Color(0xFF7C9BFF)
+val OnCobaltPrimaryDark = Color(0xFF091538)
+val CobaltContainerDark = Color(0xFF1E2A4A)
+val OnCobaltContainerDark = Color(0xFFD6E1FF)
 
 val TealSecondaryDark = Color(0xFF5EEAD4)
 val OnTealSecondaryDark = Color(0xFF003731)
 val TealContainerDark = Color(0xFF0A4F48)
 val OnTealContainerDark = Color(0xFFA7F3E8)
 
-val AmberTertiaryDark = Color(0xFFFFCA6C)
-val OnAmberTertiaryDark = Color(0xFF452B00)
-val AmberContainerDark = Color(0xFF633F00)
-val OnAmberContainerDark = Color(0xFFFFE0A6)
+val AmberTertiaryDark = Color(0xFFE5B567)
+val OnAmberTertiaryDark = Color(0xFF2E2009)
+val AmberContainerDark = Color(0xFF332818)
+val OnAmberContainerDark = Color(0xFFF6DFB5)
 
-val ObsidianBg = Color(0xFF0D1017)
-val ObsidianSurface = Color(0xFF111520)
-val ObsidianSurfaceContainerLow = Color(0xFF151A27)
-val ObsidianSurfaceContainer = Color(0xFF1A2030)
-val ObsidianSurfaceContainerHigh = Color(0xFF22293C)
-val ObsidianSurfaceContainerHighest = Color(0xFF2B344B)
+val ObsidianBg = Color(0xFF0B0D12)
+val ObsidianSurface = Color(0xFF0E1118)
+val ObsidianSurfaceContainerLow = Color(0xFF141822)
+val ObsidianSurfaceContainer = Color(0xFF171C28)
+val ObsidianSurfaceContainerHigh = Color(0xFF1B202E)
+val ObsidianSurfaceContainerHighest = Color(0xFF23293A)
 val ObsidianOnSurface = Color(0xFFE8ECF5)
-val ObsidianOnSurfaceVariant = Color(0xFFA5B0C7)
-val ObsidianOutline = Color(0xFF444F68)
-val ObsidianOutlineVariant = Color(0xFF283044)
+val ObsidianOnSurfaceVariant = Color(0xFF9EA8BE)
+val ObsidianOutline = Color(0xFF3E4861)
+val ObsidianOutlineVariant = Color(0xFF272E3F)
 
 // True AMOLED Pitch-Black Overrides
 val AmoledBg = Color(0xFF000000)
-val AmoledSurfaceContainerLow = Color(0xFF0A0C12)
-val AmoledSurfaceContainer = Color(0xFF10131C)
-val AmoledSurfaceContainerHigh = Color(0xFF171B27)
-val AmoledSurfaceContainerHighest = Color(0xFF1F2536)
+val AmoledSurfaceContainerLow = Color(0xFF0B0D12)
+val AmoledSurfaceContainer = Color(0xFF11151F)
+val AmoledSurfaceContainerHigh = Color(0xFF141822)
+val AmoledSurfaceContainerHighest = Color(0xFF1B202E)
+val AmoledOutlineVariant = Color(0xFF272E3F)
 
 // Warm Alabaster Editorial Light Palette
 val CobaltPrimaryLight = Color(0xFF2E4FDB)
@@ -65,6 +66,6 @@ val AlabasterOutlineVariant = Color(0xFFCDD4E4)
 
 // Semantic Accents
 val LiveWebActiveColor = Color(0xFF14B8A6)
-val ReasoningAccentColor = Color(0xFFF59E0B)
+val ReasoningAccentColor = Color(0xFFE5B567)
 val ErrorRoseDark = Color(0xFFFF8A8A)
 val ErrorRoseLight = Color(0xFFBA1A1A)

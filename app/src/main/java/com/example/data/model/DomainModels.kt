@@ -151,7 +151,7 @@ data class CreatorProfile(
 
 data class AppearanceConfig(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val useDynamicColor: Boolean = true,
+    val useDynamicColor: Boolean = false,
     val customAccentHex: String = "",
     val userBubbleHex: String = "",
     val assistantSurfaceHex: String = "",

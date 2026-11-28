@@ -55,9 +55,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -110,8 +112,17 @@ fun ChatComposerPanel(
 ) {
     var showAttachMenu by remember { mutableStateOf(false) }
     var showEmojiTray by remember { mutableStateOf(false) }
+    var isInputFocused by remember { mutableStateOf(false) }
     val detectedUrl = remember(text) { COMPOSER_URL_REGEX.find(text)?.value }
     val canSend = text.isNotBlank() || stagedAttachments.isNotEmpty()
+    val composerBorderColor by animateColorAsState(
+        targetValue = if (isInputFocused) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        },
+        label = "composer_focus_ring",
+    )
 
     // Compose 1.7 BasicTextField(TextFieldState) with native Modifier.contentReceiver
     // for direct Gboard & Samsung Keyboard GIF / Sticker insertion.
@@ -338,6 +349,11 @@ fun ChatComposerPanel(
                             Icon(
                                 imageVector = Icons.Outlined.AttachFile,
                                 contentDescription = "Attach photos, GIFs, documents, or webpage",
+                                tint = if (showAttachMenu || stagedAttachments.isNotEmpty()) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                             )
                         }
                         DropdownMenu(
@@ -395,8 +411,8 @@ fun ChatComposerPanel(
                             .weight(1f)
                             .heightIn(min = 48.dp)
                             .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant,
+                                width = if (isInputFocused) 1.5.dp else 1.dp,
+                                color = composerBorderColor,
                                 shape = RoundedCornerShape(22.dp),
                             ),
                     ) {
@@ -414,6 +430,7 @@ fun ChatComposerPanel(
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(vertical = 8.dp)
+                                    .onFocusChanged { isInputFocused = it.isFocused }
                                     .contentReceiver(receiveContentListener)
                                     .testTag("chat_composer_input"),
                                 decorator = { innerTextField ->

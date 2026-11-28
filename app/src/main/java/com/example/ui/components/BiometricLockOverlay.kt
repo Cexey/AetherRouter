@@ -8,11 +8,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Lock
@@ -24,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,17 +39,14 @@ fun BiometricLockOverlay(
     errorMessage: String?,
     onUnlockClick: () -> Unit,
 ) {
-    val bg = Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.surfaceContainerHigh,
-            MaterialTheme.colorScheme.background,
-        ),
-    )
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = Modifier.fillMaxSize(),
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(bg)
+                .background(aetherSubtleAuraBrush(alpha = 0.22f))
                 .padding(28.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -58,18 +55,33 @@ fun BiometricLockOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(76.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.Lock,
-                            contentDescription = "AetherRouter vault locked",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(36.dp),
-                        )
+                Box(contentAlignment = Alignment.Center) {
+                    AetherCrystalEmblem(
+                        size = 88.dp,
+                        cornerRadius = 24.dp,
+                        showHalo = true,
+                        haloSize = 116.dp,
+                        contentDescription = "AetherRouter vault locked",
+                        modifier = Modifier.testTag("biometric_hero_logo"),
+                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        border = aetherCardBorder(selected = true, accent = MaterialTheme.colorScheme.tertiary),
+                        shadowElevation = 4.dp,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .offset(x = (-10).dp, y = (-10).dp)
+                            .size(30.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
                     }
                 }
 

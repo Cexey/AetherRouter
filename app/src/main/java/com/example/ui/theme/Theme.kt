@@ -151,11 +151,13 @@ fun AetherRouterTheme(
         baseScheme.copy(
             background = AmoledBg,
             surface = AmoledBg,
+            surfaceVariant = AmoledSurfaceContainerHigh,
             surfaceContainerLowest = AmoledBg,
             surfaceContainerLow = AmoledSurfaceContainerLow,
             surfaceContainer = AmoledSurfaceContainer,
             surfaceContainerHigh = AmoledSurfaceContainerHigh,
             surfaceContainerHighest = AmoledSurfaceContainerHighest,
+            outlineVariant = AmoledOutlineVariant,
         )
     } else {
         baseScheme

@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.ui.theme.LiveWebActiveColor
 import java.net.URI
 
 /**
@@ -102,8 +103,8 @@ fun InAppBrowserOverlay(
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Chrome
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 3.dp,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     Row(
@@ -138,7 +139,7 @@ fun InAppBrowserOverlay(
                                         imageVector = Icons.Outlined.Lock,
                                         contentDescription = "Secure HTTPS",
                                         modifier = Modifier.size(12.dp),
-                                        tint = MaterialTheme.colorScheme.secondary,
+                                        tint = LiveWebActiveColor,
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                 }
@@ -170,6 +171,7 @@ fun InAppBrowserOverlay(
                             Icon(
                                 imageVector = Icons.Outlined.OpenInBrowser,
                                 contentDescription = "Open in external browser",
+                                tint = MaterialTheme.colorScheme.tertiary,
                             )
                         }
                     }
@@ -249,17 +251,19 @@ fun InAppBrowserOverlay(
 
             // Bottom Controls Bar
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 3.dp,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                    ) {
                     IconButton(
                         onClick = { webViewRef?.goBack() },
                         enabled = canGoBack,
@@ -296,6 +300,7 @@ fun InAppBrowserOverlay(
                             contentDescription = "Share URL",
                         )
                     }
+                    }
                 }
             }
         }
@@ -312,7 +317,10 @@ fun LinkActionChooserSheet(
     onAttachToChat: () -> Unit,
     onCopy: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -322,11 +330,12 @@ fun LinkActionChooserSheet(
         ) {
             Text(
                 text = "Open Link",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
             )
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
@@ -351,11 +360,18 @@ fun LinkActionChooserSheet(
             }
             OutlinedButton(
                 onClick = onOpenExternal,
+                colors = aetherSlateButtonColors(),
+                border = aetherCardBorder(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("chooser_open_external"),
             ) {
-                Icon(Icons.Outlined.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(
+                    imageVector = Icons.Outlined.OpenInBrowser,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(18.dp),
+                )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Open in External Browser")
             }

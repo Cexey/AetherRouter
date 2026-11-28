@@ -99,11 +99,11 @@ fun StagedAttachmentsStrip(
             val hasThumb = att.previewImagePath.isNotBlank() && File(att.previewImagePath).exists()
             Surface(
                 shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(),
                 modifier = Modifier
                     .height(64.dp)
                     .widthIn(min = 124.dp, max = 220.dp)
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp))
                     .testTag("staged_attachment_${att.kind.name.lowercase()}"),
             ) {
                 Row(
@@ -335,8 +335,9 @@ fun EmojiStickerTray(
 
     Surface(
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 4.dp,
+        color = MaterialTheme.colorScheme.surface,
+        border = aetherCardBorder(),
+        tonalElevation = 0.dp,
         modifier = modifier
             .fillMaxWidth()
             .height(268.dp)
@@ -349,7 +350,7 @@ fun EmojiStickerTray(
             ) {
                 TabRow(
                     selectedTabIndex = selectedTab,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     modifier = Modifier.weight(1f),
                 ) {
                     Tab(
@@ -382,6 +383,8 @@ fun EmojiStickerTray(
                         FilterChip(
                             selected = emojiCategoryIdx == idx,
                             onClick = { emojiCategoryIdx = idx },
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(enabled = true, selected = emojiCategoryIdx == idx),
                             label = { Text(label) },
                         )
                     }
@@ -422,12 +425,15 @@ fun EmojiStickerTray(
                     )
                     OutlinedButton(
                         onClick = onImportStickerClick,
+                        colors = aetherSlateButtonColors(),
+                        border = aetherCardBorder(),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.testTag("add_custom_sticker_button"),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.AddPhotoAlternate,
                             contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(6.dp))
@@ -516,7 +522,8 @@ fun ReactionChipsRow(
         reactions.forEach { (emoji, count) ->
             Surface(
                 shape = RoundedCornerShape(999.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(),
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .clickable { onToggleReaction(emoji) },
@@ -524,7 +531,7 @@ fun ReactionChipsRow(
                 Text(
                     text = if (count > 1) "$emoji $count" else emoji,
                     style = MaterialTheme.typography.labelMedium.copy(
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        color = MaterialTheme.colorScheme.onSurface,
                     ),
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 )
@@ -540,8 +547,9 @@ fun QuickReactionPickerRow(
 ) {
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        tonalElevation = 4.dp,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = aetherCardBorder(),
+        tonalElevation = 0.dp,
         modifier = modifier,
     ) {
         Row(

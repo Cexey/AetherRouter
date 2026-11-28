@@ -1,6 +1,7 @@
 package com.example.ui.components
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,11 +63,11 @@ import kotlin.math.roundToInt
 
 private val ACCENT_SWATCHES = listOf(
     "" to "Default",
-    "#5B7CFA" to "Cobalt",
-    "#20C9B7" to "Teal",
+    "#7C9BFF" to "Cobalt",
+    "#E5B567" to "Gold",
+    "#14B8A6" to "Teal",
     "#9B6DFF" to "Violet",
     "#F46A8B" to "Rose",
-    "#F5A623" to "Amber",
     "#38BDF8" to "Sky",
     "#22C55E" to "Emerald",
 )
@@ -126,7 +127,7 @@ fun AppearanceStudioOverlay(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -145,11 +146,17 @@ fun AppearanceStudioOverlay(
                     onClick = onResetDefaults,
                     modifier = Modifier.testTag("appearance_reset_button"),
                 ) {
-                    Icon(Icons.Outlined.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.RestartAlt,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(18.dp),
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Reset")
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             Column(
                 modifier = Modifier
@@ -175,6 +182,7 @@ fun AppearanceStudioOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     ThemeMode.entries.forEach { mode ->
+                        val isSelected = appearance.themeMode == mode
                         val label = when (mode) {
                             ThemeMode.SYSTEM -> "System"
                             ThemeMode.LIGHT -> "Light"
@@ -182,8 +190,10 @@ fun AppearanceStudioOverlay(
                             ThemeMode.AMOLED -> "AMOLED #000"
                         }
                         FilterChip(
-                            selected = appearance.themeMode == mode,
+                            selected = isSelected,
                             onClick = { onUpdateAppearance { it.copy(themeMode = mode) } },
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(selected = isSelected),
                             label = { Text(label) },
                             modifier = Modifier.testTag("theme_mode_${mode.name.lowercase()}"),
                         )
@@ -277,16 +287,22 @@ fun AppearanceStudioOverlay(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         BUNDLED_FONTS.forEach { (key, label) ->
+                            val isSelected = appearance.selectedFontKey == key
                             FilterChip(
-                                selected = appearance.selectedFontKey == key,
+                                selected = isSelected,
                                 onClick = { onUpdateAppearance { it.copy(selectedFontKey = key) } },
+                                colors = aetherFilterChipColors(),
+                                border = aetherFilterChipBorder(selected = isSelected),
                                 label = { Text(label) },
                             )
                         }
                         if (appearance.customFontPath.isNotBlank()) {
+                            val isCustomSelected = appearance.selectedFontKey == "custom"
                             FilterChip(
-                                selected = appearance.selectedFontKey == "custom",
+                                selected = isCustomSelected,
                                 onClick = { onUpdateAppearance { it.copy(selectedFontKey = "custom") } },
+                                colors = aetherFilterChipColors(),
+                                border = aetherFilterChipBorder(selected = isCustomSelected),
                                 label = { Text(appearance.customFontName.ifBlank { "Custom Font" }) },
                                 leadingIcon = {
                                     Icon(Icons.Outlined.FontDownload, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -297,11 +313,18 @@ fun AppearanceStudioOverlay(
 
                     OutlinedButton(
                         onClick = onUploadCustomFontClick,
+                        colors = aetherSlateButtonColors(),
+                        border = aetherCardBorder(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("upload_custom_font_button"),
                     ) {
-                        Icon(Icons.Outlined.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.UploadFile,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(18.dp),
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             if (appearance.customFontName.isNotBlank()) {
@@ -419,6 +442,7 @@ private fun LiveChatPreviewCard(
                         bottomEnd = (cornerRadiusDp.value * 0.35f).coerceAtLeast(4f).dp,
                     ),
                     color = userBg,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)),
                     modifier = Modifier.widthIn(max = 260.dp),
                 ) {
                     Text(
@@ -431,6 +455,7 @@ private fun LiveChatPreviewCard(
             Surface(
                 shape = RoundedCornerShape(cornerRadiusDp),
                 color = assistantBg,
+                border = aetherCardBorder(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -510,9 +535,10 @@ private fun ColorSwatchPickerRow(
         OutlinedTextField(
             value = hexInput,
             onValueChange = onHexInputChange,
-            label = { Text("Custom Hex (e.g. #5B7CFA, blank for Auto)") },
+            label = { Text("Custom Hex (e.g. #7C9BFF, blank for Auto)") },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
+            colors = aetherTextFieldColors(),
             modifier = Modifier.fillMaxWidth(),
         )
     }

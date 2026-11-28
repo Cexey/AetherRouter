@@ -67,6 +67,7 @@ fun ProjectFolderDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = {
             Text(
                 text = if (existingFolder == null) "New Project Folder" else "Edit Project Folder",
@@ -82,6 +83,7 @@ fun ProjectFolderDialog(
                     placeholder = { Text("e.g., Android Architecture, Research") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("project_name_input"),
@@ -132,6 +134,7 @@ fun ProjectFolderDialog(
                     placeholder = { Text("e.g., anthropic/claude-sonnet-4") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -143,6 +146,7 @@ fun ProjectFolderDialog(
                     minLines = 3,
                     maxLines = 5,
                     shape = RoundedCornerShape(12.dp),
+                    colors = aetherTextFieldColors(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("project_instructions_input"),
@@ -192,16 +196,19 @@ fun MoveToFolderDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = { Text("Move Chat to Project") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val unfiledSelected = currentFolderId == null
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (currentFolderId == null) {
+                    color = if (unfiledSelected) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerLow
                     },
+                    border = aetherCardBorder(selected = unfiledSelected),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
@@ -214,7 +221,12 @@ fun MoveToFolderDialog(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(18.dp),
+                        )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text("Unfiled (All Chats)", style = MaterialTheme.typography.titleSmall)
                     }
@@ -230,6 +242,7 @@ fun MoveToFolderDialog(
                         } else {
                             MaterialTheme.colorScheme.surfaceContainerLow
                         },
+                        border = aetherCardBorder(selected = selected),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
@@ -271,6 +284,7 @@ fun AttachWebpageUrlDialog(
     var urlInput by remember { mutableStateOf("https://") }
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = { Text("Attach Live Webpage") },
         text = {
             OutlinedTextField(
@@ -280,6 +294,7 @@ fun AttachWebpageUrlDialog(
                 placeholder = { Text("https://example.com/article") },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
+                colors = aetherTextFieldColors(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("attach_webpage_url_input"),

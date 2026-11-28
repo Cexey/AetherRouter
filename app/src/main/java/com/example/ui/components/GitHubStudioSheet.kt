@@ -154,62 +154,69 @@ fun GitHubStudioOverlay(
         Column(modifier = Modifier.fillMaxSize()) {
             // Header
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = {
-                            if (state.selectedRepo != null && state.commitPreview == null) {
-                                onBackToRepos()
-                            } else {
-                                onClose()
-                            }
-                        },
-                        modifier = Modifier.testTag("github_studio_back_button"),
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = when {
-                                pendingPush != null && state.selectedRepo != null ->
-                                    "Push to ${state.selectedRepo.name}"
-                                pendingPush != null -> "Select Repo to Push Code"
-                                state.selectedRepo != null -> state.selectedRepo.fullName
-                                else -> "GitHub Repo Studio"
-                            },
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = state.authenticatedUser?.let { "Signed in as @$it" }
-                                ?: "api.github.com • Encrypted PAT",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        )
-                    }
-                    if (hasGitHubPat) {
                         IconButton(
-                            onClick = onRefreshRepos,
-                            enabled = !state.isLoading,
-                            modifier = Modifier.testTag("github_refresh_button"),
+                            onClick = {
+                                if (state.selectedRepo != null && state.commitPreview == null) {
+                                    onBackToRepos()
+                                } else {
+                                    onClose()
+                                }
+                            },
+                            modifier = Modifier.testTag("github_studio_back_button"),
                         ) {
-                            if (state.isLoading) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(Icons.Outlined.Refresh, contentDescription = "Refresh repositories")
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = when {
+                                    pendingPush != null && state.selectedRepo != null ->
+                                        "Push to ${state.selectedRepo.name}"
+                                    pendingPush != null -> "Select Repo to Push Code"
+                                    state.selectedRepo != null -> state.selectedRepo.fullName
+                                    else -> "GitHub Repo Studio"
+                                },
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = state.authenticatedUser?.let { "Signed in as @$it" }
+                                    ?: "api.github.com • Encrypted PAT",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
+                            )
+                        }
+                        if (hasGitHubPat) {
+                            IconButton(
+                                onClick = onRefreshRepos,
+                                enabled = !state.isLoading,
+                                modifier = Modifier.testTag("github_refresh_button"),
+                            ) {
+                                if (state.isLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Refresh,
+                                        contentDescription = "Refresh repositories",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
                             }
                         }
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
 
@@ -223,7 +230,8 @@ fun GitHubStudioOverlay(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = aetherCardBorder(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
@@ -233,7 +241,7 @@ fun GitHubStudioOverlay(
                             Icon(
                                 imageVector = Icons.Outlined.Code,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(28.dp),
                             )
                             Text(
@@ -364,9 +372,16 @@ fun GitHubStudioOverlay(
                         value = repoSearch,
                         onValueChange = { repoSearch = it },
                         placeholder = { Text("Filter repositories…") },
-                        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
+                        colors = aetherTextFieldColors(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -415,6 +430,7 @@ fun GitHubStudioOverlay(
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
                                     color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    border = aetherCardBorder(),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(14.dp))
@@ -433,7 +449,7 @@ fun GitHubStudioOverlay(
                                                 imageVector = if (repo.isPrivate) Icons.Outlined.Lock else Icons.Outlined.Public,
                                                 contentDescription = if (repo.isPrivate) "Private repo" else "Public repo",
                                                 modifier = Modifier.size(15.dp),
-                                                tint = MaterialTheme.colorScheme.primary,
+                                                tint = if (repo.isPrivate) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                                             )
                                             Text(
                                                 text = repo.fullName,
@@ -496,6 +512,8 @@ fun GitHubStudioOverlay(
                             FilterChip(
                                 selected = true,
                                 onClick = { branchMenuOpen = true },
+                                colors = aetherFilterChipColors(),
+                                border = aetherFilterChipBorder(enabled = true, selected = true),
                                 label = {
                                     Text(
                                         text = "Branch: $activeBranch",
@@ -508,6 +526,7 @@ fun GitHubStudioOverlay(
                             DropdownMenu(
                                 expanded = branchMenuOpen,
                                 onDismissRequest = { branchMenuOpen = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
                             ) {
                                 val branchList = state.branches.ifEmpty {
                                     listOf(GitHubBranchSummary(name = activeRepo.defaultBranch))
@@ -567,10 +586,10 @@ fun GitHubStudioOverlay(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = aetherCardBorder(selected = true),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
                                     .testTag("github_commit_preview_card"),
                             ) {
                                 Column(
@@ -652,6 +671,8 @@ fun GitHubStudioOverlay(
                                         OutlinedButton(
                                             onClick = onClearCommitPreview,
                                             enabled = !state.isCommitting,
+                                            colors = aetherSlateButtonColors(),
+                                            border = aetherCardBorder(),
                                             modifier = Modifier.weight(1f),
                                         ) {
                                             Text("Edit")
@@ -680,7 +701,8 @@ fun GitHubStudioOverlay(
                         if (pendingPush != null) {
                             Surface(
                                 shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = aetherCardBorder(),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -709,6 +731,7 @@ fun GitHubStudioOverlay(
                                         placeholder = { Text("e.g. src/main/App.kt") },
                                         singleLine = true,
                                         shape = RoundedCornerShape(12.dp),
+                                        colors = aetherTextFieldColors(),
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("github_commit_path_input"),
@@ -719,6 +742,7 @@ fun GitHubStudioOverlay(
                                         label = { Text("Commit message") },
                                         singleLine = true,
                                         shape = RoundedCornerShape(12.dp),
+                                        colors = aetherTextFieldColors(),
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("github_commit_message_input"),
@@ -761,6 +785,7 @@ fun GitHubStudioOverlay(
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                            border = aetherCardBorder(),
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(12.dp))
@@ -774,7 +799,11 @@ fun GitHubStudioOverlay(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                             ) {
-                                                Icon(Icons.Outlined.Folder, contentDescription = null)
+                                                Icon(
+                                                    imageVector = Icons.Outlined.Folder,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.tertiary,
+                                                )
                                                 Text(".. (Up one folder)", fontFamily = JetBrainsMonoFontFamily)
                                             }
                                         }
@@ -785,6 +814,7 @@ fun GitHubStudioOverlay(
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
                                         color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        border = aetherCardBorder(),
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(12.dp))
@@ -808,9 +838,9 @@ fun GitHubStudioOverlay(
                                                 imageVector = if (entry.isDirectory) Icons.Outlined.Folder else Icons.Outlined.Description,
                                                 contentDescription = if (entry.isDirectory) "Folder" else "File",
                                                 tint = if (entry.isDirectory) {
-                                                    MaterialTheme.colorScheme.primary
+                                                    MaterialTheme.colorScheme.tertiary
                                                 } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                    MaterialTheme.colorScheme.primary
                                                 },
                                             )
                                             Column(modifier = Modifier.weight(1f)) {
@@ -841,9 +871,16 @@ fun GitHubStudioOverlay(
                                                     OutlinedButton(
                                                         onClick = { onAttachFileToChat(entry) },
                                                         enabled = !state.isAttachingFile,
+                                                        colors = aetherSlateButtonColors(),
+                                                        border = aetherCardBorder(),
                                                         modifier = Modifier.testTag("github_attach_file_${entry.name}"),
                                                     ) {
-                                                        Icon(Icons.Outlined.AttachFile, contentDescription = null, modifier = Modifier.size(15.dp))
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.AttachFile,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(15.dp),
+                                                        )
                                                         Spacer(modifier = Modifier.width(4.dp))
                                                         Text("Attach")
                                                     }

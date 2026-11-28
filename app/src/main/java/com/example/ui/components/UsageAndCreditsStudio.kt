@@ -123,10 +123,14 @@ fun CompactSpendCreditsPill(
 
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, statusColor.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+            .border(
+                width = 1.dp,
+                color = if (hasApiKey) statusColor.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(14.dp),
+            )
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .testTag(testTagName),
@@ -351,47 +355,54 @@ fun UsageAndCreditsStudioOverlay(
         Column(modifier = Modifier.fillMaxSize()) {
             // Top App Bar
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = onClose,
-                        modifier = Modifier.testTag("usage_studio_close_button"),
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Usage & Credits Studio",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = "Synced: $updatedLabel",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
-                        )
-                    }
-                    IconButton(
-                        onClick = onRefreshAll,
-                        enabled = !isLoadingUsage && !isLoadingActivity && hasApiKey,
-                        modifier = Modifier.testTag("usage_studio_refresh_button"),
-                    ) {
-                        if (isLoadingUsage || isLoadingActivity) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh usage and credits")
+                        IconButton(
+                            onClick = onClose,
+                            modifier = Modifier.testTag("usage_studio_close_button"),
+                        ) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Usage & Credits Studio",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = "Synced: $updatedLabel",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
+                            )
+                        }
+                        IconButton(
+                            onClick = onRefreshAll,
+                            enabled = !isLoadingUsage && !isLoadingActivity && hasApiKey,
+                            modifier = Modifier.testTag("usage_studio_refresh_button"),
+                        ) {
+                            if (isLoadingUsage || isLoadingActivity) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.Refresh,
+                                    contentDescription = "Refresh usage and credits",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         }
                     }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
 
@@ -407,7 +418,8 @@ fun UsageAndCreditsStudioOverlay(
                     item {
                         Surface(
                             shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = aetherCardBorder(),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Column(
@@ -417,7 +429,7 @@ fun UsageAndCreditsStudioOverlay(
                                 Icon(
                                     imageVector = Icons.Outlined.Key,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.size(28.dp),
                                 )
                                 Text(
@@ -566,7 +578,8 @@ fun UsageAndCreditsStudioOverlay(
                         item {
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = aetherCardBorder(),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Column(
@@ -585,9 +598,16 @@ fun UsageAndCreditsStudioOverlay(
                                     )
                                     OutlinedButton(
                                         onClick = onOpenSettingsForKeys,
+                                        colors = aetherSlateButtonColors(),
+                                        border = aetherCardBorder(),
                                         modifier = Modifier.testTag("usage_add_management_key_button"),
                                     ) {
-                                        Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Icon(
+                                            imageVector = Icons.Outlined.Key,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(16.dp),
+                                        )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text("Configure Management Key")
                                     }
@@ -603,12 +623,16 @@ fun UsageAndCreditsStudioOverlay(
                                 FilterChip(
                                     selected = activityGroupByModel,
                                     onClick = { activityGroupByModel = true },
+                                    colors = aetherFilterChipColors(),
+                                    border = aetherFilterChipBorder(enabled = true, selected = activityGroupByModel),
                                     label = { Text("By Model") },
                                     modifier = Modifier.testTag("activity_group_by_model_chip"),
                                 )
                                 FilterChip(
                                     selected = !activityGroupByModel,
                                     onClick = { activityGroupByModel = false },
+                                    colors = aetherFilterChipColors(),
+                                    border = aetherFilterChipBorder(enabled = true, selected = !activityGroupByModel),
                                     label = { Text("By Date") },
                                     modifier = Modifier.testTag("activity_group_by_date_chip"),
                                 )
@@ -637,6 +661,7 @@ fun UsageAndCreditsStudioOverlay(
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
                                     color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    border = aetherCardBorder(),
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Text(
@@ -680,11 +705,9 @@ private fun HeroBalanceCard(
 
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-        tonalElevation = 3.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(20.dp)),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = aetherCardBorder(selected = true),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -702,7 +725,7 @@ private fun HeroBalanceCard(
                     Icon(
                         imageVector = Icons.Outlined.AccountBalanceWallet,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.tertiary,
                     )
                     Text(
                         text = snapshot?.label?.takeIf { it.isNotBlank() } ?: "Active OpenRouter Key",
@@ -789,8 +812,15 @@ private fun HeroBalanceCard(
                 OutlinedButton(
                     onClick = onRefresh,
                     enabled = !isLoading,
+                    colors = aetherSlateButtonColors(),
+                    border = aetherCardBorder(),
                 ) {
-                    Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Refresh")
                 }
@@ -808,7 +838,8 @@ private fun SpendMetricCard(
 ) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = aetherCardBorder(),
         modifier = modifier,
     ) {
         Column(
@@ -861,6 +892,7 @@ private fun BudgetWindowCard(
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = aetherCardBorder(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -923,6 +955,7 @@ private fun ActivityGroupRowCard(
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = aetherCardBorder(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(

@@ -82,6 +82,7 @@ import com.example.data.model.SamplerPreset
 import com.example.data.model.ThemeMode
 import com.example.data.model.WebSearchEngine
 import com.example.data.model.WebSearchMode
+import com.example.ui.theme.LiveWebActiveColor
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,6 +130,7 @@ fun VaultAndPreferencesSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
@@ -142,7 +144,7 @@ fun VaultAndPreferencesSheet(
                 Icon(
                     imageVector = Icons.Outlined.Key,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.tertiary,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -166,7 +168,8 @@ fun VaultAndPreferencesSheet(
             // Encrypted OpenRouter API Key Card
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -209,6 +212,7 @@ fun VaultAndPreferencesSheet(
                             }
                         },
                         shape = RoundedCornerShape(14.dp),
+                        colors = aetherTextFieldColors(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("api_key_input"),
@@ -231,6 +235,8 @@ fun VaultAndPreferencesSheet(
                         if (preferences.hasApiKey) {
                             OutlinedButton(
                                 onClick = { onSaveApiKey("") },
+                                colors = aetherSlateButtonColors(),
+                                border = aetherCardBorder(),
                                 modifier = Modifier.testTag("clear_api_key_button"),
                             ) {
                                 Text("Clear")
@@ -299,7 +305,8 @@ fun VaultAndPreferencesSheet(
             // Optional OpenRouter Management API Key (30-Day Activity Breakdown)
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -351,6 +358,7 @@ fun VaultAndPreferencesSheet(
                             }
                         },
                         shape = RoundedCornerShape(14.dp),
+                        colors = aetherTextFieldColors(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("management_api_key_input"),
@@ -373,6 +381,8 @@ fun VaultAndPreferencesSheet(
                         if (preferences.hasManagementApiKey) {
                             OutlinedButton(
                                 onClick = { onSaveManagementApiKey("") },
+                                colors = aetherSlateButtonColors(),
+                                border = aetherCardBorder(),
                                 modifier = Modifier.testTag("clear_management_api_key_button"),
                             ) {
                                 Text("Clear")
@@ -385,7 +395,8 @@ fun VaultAndPreferencesSheet(
             // Optional GitHub Personal Access Token (PAT) for GitHub Repo Studio
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -437,6 +448,7 @@ fun VaultAndPreferencesSheet(
                             }
                         },
                         shape = RoundedCornerShape(14.dp),
+                        colors = aetherTextFieldColors(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("github_pat_input"),
@@ -462,12 +474,16 @@ fun VaultAndPreferencesSheet(
                                     onDismiss()
                                     onOpenGitHubStudio()
                                 },
+                                colors = aetherSlateButtonColors(),
+                                border = aetherCardBorder(),
                                 modifier = Modifier.testTag("settings_open_github_studio_button"),
                             ) {
                                 Text("Browse")
                             }
                             OutlinedButton(
                                 onClick = { onSaveGitHubPat("") },
+                                colors = aetherSlateButtonColors(),
+                                border = aetherCardBorder(),
                                 modifier = Modifier.testTag("clear_github_pat_button"),
                             ) {
                                 Text("Clear")
@@ -519,9 +535,16 @@ fun VaultAndPreferencesSheet(
                         onDismiss()
                         onOpenAppearanceStudio()
                     },
+                    colors = aetherSlateButtonColors(),
+                    border = aetherCardBorder(),
                     modifier = Modifier.testTag("open_appearance_studio_button"),
                 ) {
-                    Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Palette,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Full Studio")
                 }
@@ -531,9 +554,12 @@ fun VaultAndPreferencesSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ThemeMode.entries.forEach { mode ->
+                    val isSelected = preferences.themeMode == mode
                     FilterChip(
-                        selected = preferences.themeMode == mode,
+                        selected = isSelected,
                         onClick = { onThemeModeChange(mode) },
+                        colors = aetherFilterChipColors(),
+                        border = aetherFilterChipBorder(selected = isSelected),
                         label = { Text(if (mode == ThemeMode.AMOLED) "AMOLED" else mode.name.lowercase().replaceFirstChar { it.uppercase() }) },
                     )
                 }
@@ -602,9 +628,12 @@ fun VaultAndPreferencesSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 LinkOpenBehavior.entries.forEach { behavior ->
+                    val isSelected = preferences.linkOpenBehavior == behavior
                     FilterChip(
-                        selected = preferences.linkOpenBehavior == behavior,
+                        selected = isSelected,
                         onClick = { onLinkBehaviorChange(behavior) },
+                        colors = aetherFilterChipColors(),
+                        border = aetherFilterChipBorder(selected = isSelected),
                         label = {
                             Text(
                                 when (behavior) {
@@ -624,19 +653,27 @@ fun VaultAndPreferencesSheet(
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("settings_about_footer_card"),
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        AetherCrystalEmblem(
+                            size = 40.dp,
+                            cornerRadius = 11.dp,
+                            showHalo = false,
+                            contentDescription = "AetherRouter",
+                            modifier = Modifier.testTag("settings_about_logo"),
+                        )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "AetherRouter",
@@ -658,6 +695,7 @@ fun VaultAndPreferencesSheet(
                         Surface(
                             shape = RoundedCornerShape(999.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
+                            border = aetherCardBorder(selected = true),
                             modifier = Modifier.testTag("settings_version_badge"),
                         ) {
                             Text(
@@ -680,6 +718,7 @@ fun VaultAndPreferencesSheet(
                         },
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainer,
+                        border = aetherCardBorder(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
@@ -721,6 +760,7 @@ fun VaultAndPreferencesSheet(
                         onClick = { onProfileEmailClick("kustard.cloudz@gmail.com") },
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainer,
+                        border = aetherCardBorder(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
@@ -734,7 +774,7 @@ fun VaultAndPreferencesSheet(
                             Icon(
                                 imageVector = Icons.Outlined.Email,
                                 contentDescription = "Developer email",
-                                tint = MaterialTheme.colorScheme.secondary,
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(18.dp),
                             )
                             Column(modifier = Modifier.weight(1f)) {
@@ -829,6 +869,7 @@ fun WebAndSamplerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
@@ -842,7 +883,7 @@ fun WebAndSamplerSheet(
                 Icon(
                     imageVector = Icons.Outlined.Language,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.secondary,
+                    tint = LiveWebActiveColor,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -868,14 +909,20 @@ fun WebAndSamplerSheet(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val isAgentic = webMode == WebSearchMode.AGENTIC_TOOL
+                    val isAlwaysOn = webMode == WebSearchMode.ALWAYS_ON_PLUGIN
                     FilterChip(
-                        selected = webMode == WebSearchMode.AGENTIC_TOOL,
+                        selected = isAgentic,
                         onClick = { webMode = WebSearchMode.AGENTIC_TOOL },
+                        colors = aetherFilterChipColors(),
+                        border = aetherFilterChipBorder(selected = isAgentic),
                         label = { Text("Agentic Tools (Billing-Safe)") },
                     )
                     FilterChip(
-                        selected = webMode == WebSearchMode.ALWAYS_ON_PLUGIN,
+                        selected = isAlwaysOn,
                         onClick = { webMode = WebSearchMode.ALWAYS_ON_PLUGIN },
+                        colors = aetherFilterChipColors(),
+                        border = aetherFilterChipBorder(selected = isAlwaysOn),
                         label = { Text("Always-On Plugin") },
                     )
                 }
@@ -896,9 +943,12 @@ fun WebAndSamplerSheet(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WebSearchEngine.entries.forEach { engine ->
+                        val isEngineSelected = webEngine == engine
                         FilterChip(
-                            selected = webEngine == engine,
+                            selected = isEngineSelected,
                             onClick = { webEngine = engine },
+                            colors = aetherFilterChipColors(),
+                            border = aetherFilterChipBorder(selected = isEngineSelected),
                             label = { Text(engine.label) },
                         )
                     }
@@ -936,9 +986,16 @@ fun WebAndSamplerSheet(
                 )
                 OutlinedButton(
                     onClick = { showSavePresetRow = !showSavePresetRow },
+                    colors = aetherSlateButtonColors(),
+                    border = aetherCardBorder(),
                     modifier = Modifier.testTag("toggle_save_preset_button"),
                 ) {
-                    Icon(Icons.Outlined.BookmarkAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.BookmarkAdd,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Save Current")
                 }
@@ -1032,9 +1089,12 @@ fun WebAndSamplerSheet(
                     ReasoningEffort.MEDIUM,
                     ReasoningEffort.HIGH,
                 ).forEach { effort ->
+                    val isEffortSelected = reasoningEffort == effort
                     FilterChip(
-                        selected = reasoningEffort == effort,
+                        selected = isEffortSelected,
                         onClick = { reasoningEffort = effort },
+                        colors = aetherFilterChipColors(),
+                        border = aetherFilterChipBorder(selected = isEffortSelected),
                         label = { Text(effort.label) },
                     )
                 }
@@ -1090,9 +1150,16 @@ fun WebAndSamplerSheet(
                     OutlinedButton(
                         enabled = fallbackModelIds.size < 3 && allModels.isNotEmpty(),
                         onClick = { showFallbackPickerMenu = true },
+                        colors = aetherSlateButtonColors(),
+                        border = aetherCardBorder(),
                         modifier = Modifier.testTag("add_fallback_model_button"),
                     ) {
-                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Add")
                     }

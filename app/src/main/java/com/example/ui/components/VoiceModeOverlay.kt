@@ -86,15 +86,12 @@ fun VoiceModeOverlay(
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
-    val bgBrush = Brush.verticalGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.surfaceContainer,
-            MaterialTheme.colorScheme.background,
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
-        ),
-    )
+    val bgBrush = aetherSubtleAuraBrush(alpha = 0.20f)
 
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = Modifier.fillMaxSize(),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -148,16 +145,21 @@ fun VoiceModeOverlay(
                 FilterChip(
                     selected = autoSend,
                     onClick = { autoSend = !autoSend },
+                    colors = aetherFilterChipColors(),
+                    border = aetherFilterChipBorder(enabled = true, selected = autoSend),
                     label = { Text("Auto-Send") },
                     modifier = Modifier.testTag("voice_autosend_chip"),
                 )
                 FilterChip(
                     selected = autoSpeakReply,
                     onClick = { autoSpeakReply = !autoSpeakReply },
+                    colors = aetherFilterChipColors(),
+                    border = aetherFilterChipBorder(enabled = true, selected = autoSpeakReply),
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Outlined.VolumeUp,
                             contentDescription = null,
+                            tint = if (autoSpeakReply) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp),
                         )
                     },
@@ -201,7 +203,8 @@ fun VoiceModeOverlay(
             val shownTranscript = voiceState.partialTranscript.ifBlank { voiceState.finalTranscript }
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = aetherCardBorder(selected = voiceState.isListening),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -243,11 +246,18 @@ fun VoiceModeOverlay(
             if (voiceState.isSpeaking) {
                 OutlinedButton(
                     onClick = onStopSpeaking,
+                    colors = aetherSlateButtonColors(),
+                    border = aetherCardBorder(),
                     modifier = Modifier
                         .padding(bottom = 14.dp)
                         .testTag("voice_stop_tts_button"),
                 ) {
-                    Icon(Icons.Outlined.VolumeOff, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.VolumeOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(18.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Stop Speaking")
                 }

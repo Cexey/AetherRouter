@@ -11,6 +11,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -80,6 +82,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -98,6 +101,10 @@ import com.example.data.model.ChatMessage
 import com.example.data.model.Conversation
 import com.example.data.model.Folder
 import com.example.data.model.WebSearchMode
+import com.example.ui.components.AetherCrystalEmblem
+import com.example.ui.components.aetherCardBorder
+import com.example.ui.components.aetherSlateButtonColors
+import com.example.ui.components.aetherTextFieldColors
 import com.example.ui.components.AppearanceStudioOverlay
 import com.example.ui.components.AttachWebpageUrlDialog
 import com.example.ui.components.ChatComposerPanel
@@ -517,7 +524,10 @@ fun ChatWorkspaceScreen(
         if (isExpandedLayout) {
             PermanentNavigationDrawer(
                 drawerContent = {
-                    PermanentDrawerSheet(modifier = Modifier.width(310.dp)) {
+                    PermanentDrawerSheet(
+                        drawerContainerColor = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.width(310.dp),
+                    ) {
                         drawerBodyContent(false)
                     }
                 },
@@ -527,7 +537,10 @@ fun ChatWorkspaceScreen(
             ModalNavigationDrawer(
                 drawerState = drawerState,
                 drawerContent = {
-                    ModalDrawerSheet(modifier = Modifier.widthIn(max = 320.dp)) {
+                    ModalDrawerSheet(
+                        drawerContainerColor = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.widthIn(max = 320.dp),
+                    ) {
                         drawerBodyContent(true)
                     }
                 },
@@ -909,155 +922,170 @@ private fun ChatTopHeaderBar(
     }
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 2.dp,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (showDrawerButton) {
-                    IconButton(
-                        onClick = onOpenDrawer,
-                        modifier = Modifier.testTag("open_drawer_button"),
-                    ) {
-                        Icon(Icons.Outlined.Menu, contentDescription = "Open conversations")
-                    }
-                }
-
-                // Widened Model Selector Pill
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 4.dp)
-                        .height(42.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .clickable(onClick = onOpenModelPicker)
-                        .testTag("model_selector_pill"),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(horizontal = 14.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (uiState.preferences.hasApiKey) LiveWebActiveColor
-                                    else MaterialTheme.colorScheme.tertiary,
-                                ),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = activeModelName,
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Outlined.KeyboardArrowDown,
-                            contentDescription = "Choose model",
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                }
-
-                IconButton(
-                    onClick = onOpenVaultSettings,
-                    modifier = Modifier.testTag("open_vault_settings_button"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Key,
-                        contentDescription = "API key, credits, profile, export, and settings",
-                        tint = if (uiState.preferences.hasApiKey) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.tertiary
-                        },
-                    )
-                }
-
-                IconButton(
-                    onClick = onNewChat,
-                    modifier = Modifier.testTag("new_chat_button"),
-                ) {
-                    Icon(Icons.Outlined.Add, contentDescription = "New conversation")
-                }
-            }
-
-            // Live Android System Clock & Live Web Grounding Status Strip
-            Row(
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Schedule,
-                        contentDescription = "Live Android clock",
-                        modifier = Modifier.size(13.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "${uiState.clock.headerLabel(uiState.preferences.use24HourClock)} ${uiState.clock.timezoneShort}",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        modifier = Modifier.testTag("live_clock_pill"),
-                    )
+                    if (showDrawerButton) {
+                        IconButton(
+                            onClick = onOpenDrawer,
+                            modifier = Modifier.testTag("open_drawer_button"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Menu,
+                                contentDescription = "Open conversations",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+
+                    // Widened Model Selector Pill
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = aetherCardBorder(),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable(onClick = onOpenModelPicker)
+                            .testTag("model_selector_pill"),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 14.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (uiState.preferences.hasApiKey) LiveWebActiveColor
+                                        else MaterialTheme.colorScheme.tertiary,
+                                    ),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = activeModelName,
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Outlined.KeyboardArrowDown,
+                                contentDescription = "Choose model",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onOpenVaultSettings,
+                        modifier = Modifier.testTag("open_vault_settings_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Key,
+                            contentDescription = "API key, credits, profile, export, and settings",
+                            tint = MaterialTheme.colorScheme.tertiary,
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onNewChat,
+                        modifier = Modifier.testTag("new_chat_button"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Add,
+                            contentDescription = "New conversation",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = if (webEnabled) {
-                        LiveWebActiveColor.copy(alpha = 0.16f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    },
+                // Live Android System Clock & Live Web Grounding Status Strip
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .clickable(onClick = onToggleWebSearch)
-                        .testTag("live_web_toggle_pill"),
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.Language,
-                            contentDescription = "Toggle live web search",
-                            tint = if (webEnabled) LiveWebActiveColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            imageVector = Icons.Outlined.Schedule,
+                            contentDescription = "Live Android clock",
                             modifier = Modifier.size(13.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = webLabel,
+                            text = "${uiState.clock.headerLabel(uiState.preferences.use24HourClock)} ${uiState.clock.timezoneShort}",
                             style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (webEnabled) LiveWebActiveColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
+                            modifier = Modifier.testTag("live_clock_pill"),
                         )
                     }
+
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = if (webEnabled) {
+                            LiveWebActiveColor.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerLow
+                        },
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (webEnabled) {
+                                LiveWebActiveColor.copy(alpha = 0.35f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                        ),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .clickable(onClick = onToggleWebSearch)
+                            .testTag("live_web_toggle_pill"),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Language,
+                                contentDescription = "Toggle live web search",
+                                tint = if (webEnabled) LiveWebActiveColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(13.dp),
+                            )
+                            Text(
+                                text = webLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (webEnabled) LiveWebActiveColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
+                            )
+                        }
+                    }
                 }
-            }
 
             // Active Persona, Shared Lorebooks & MCP Tools Badges (when configured on current chat)
             val activePersona = uiState.activePersona
@@ -1075,7 +1103,8 @@ private fun ChatTopHeaderBar(
                     if (activePersona != null) {
                         Surface(
                             shape = RoundedCornerShape(999.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = aetherCardBorder(selected = true, accent = MaterialTheme.colorScheme.tertiary),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .clickable(onClick = onOpenPersonaStudio)
@@ -1089,13 +1118,13 @@ private fun ChatTopHeaderBar(
                                 Icon(
                                     imageVector = Icons.Outlined.Face,
                                     contentDescription = "Active persona",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    tint = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.size(13.dp),
                                 )
                                 Text(
                                     text = activePersona.name,
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = FontWeight.SemiBold,
                                     ),
                                     maxLines = 1,
@@ -1109,6 +1138,7 @@ private fun ChatTopHeaderBar(
                         Surface(
                             shape = RoundedCornerShape(999.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
+                            border = aetherCardBorder(selected = true),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .clickable(onClick = onOpenPersonaStudio)
@@ -1189,6 +1219,8 @@ private fun ChatTopHeaderBar(
                     onCompressClick = onCompressContext,
                 )
             }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
     }
 }
@@ -1369,7 +1401,7 @@ private fun EmptyChatCanvas(
 ) {
     val bgGlow = Brush.radialGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f),
             MaterialTheme.colorScheme.background,
         ),
     )
@@ -1385,20 +1417,14 @@ private fun EmptyChatCanvas(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(64.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.AutoAwesome,
-                        contentDescription = "AetherRouter",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(30.dp),
-                    )
-                }
-            }
+            AetherCrystalEmblem(
+                size = 92.dp,
+                cornerRadius = 24.dp,
+                showHalo = true,
+                haloSize = 116.dp,
+                contentDescription = "AetherRouter",
+                modifier = Modifier.testTag("empty_hero_logo"),
+            )
 
             Text(
                 text = "AetherRouter",
@@ -1432,6 +1458,13 @@ private fun EmptyChatCanvas(
             }
 
             val pillPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+            val pillColors = ButtonDefaults.outlinedButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            )
+            val pillBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            val cobaltAccent = MaterialTheme.colorScheme.primary
+            val goldAccent = MaterialTheme.colorScheme.tertiary
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1439,13 +1472,20 @@ private fun EmptyChatCanvas(
             ) {
                 OutlinedButton(
                     onClick = onOpenModelPicker,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .testTag("empty_browse_models_button"),
                 ) {
-                    Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        tint = cobaltAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Models",
@@ -1456,13 +1496,20 @@ private fun EmptyChatCanvas(
                 }
                 OutlinedButton(
                     onClick = onOpenPersonaStudio,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .testTag("empty_personas_button"),
                 ) {
-                    Icon(Icons.Outlined.Face, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Face,
+                        contentDescription = null,
+                        tint = goldAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Personas",
@@ -1479,13 +1526,20 @@ private fun EmptyChatCanvas(
             ) {
                 OutlinedButton(
                     onClick = onOpenModelCompare,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .testTag("empty_compare_button"),
                 ) {
-                    Icon(Icons.Outlined.CompareArrows, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.CompareArrows,
+                        contentDescription = null,
+                        tint = goldAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Compare",
@@ -1496,13 +1550,20 @@ private fun EmptyChatCanvas(
                 }
                 OutlinedButton(
                     onClick = onOpenAppearanceStudio,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .testTag("empty_appearance_button"),
                 ) {
-                    Icon(Icons.Outlined.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Palette,
+                        contentDescription = null,
+                        tint = cobaltAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Theme",
@@ -1519,13 +1580,20 @@ private fun EmptyChatCanvas(
             ) {
                 OutlinedButton(
                     onClick = onOpenWebSampler,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .testTag("empty_web_sampler_button"),
                 ) {
-                    Icon(Icons.Outlined.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Language,
+                        contentDescription = null,
+                        tint = cobaltAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Web & Sampler",
@@ -1536,13 +1604,20 @@ private fun EmptyChatCanvas(
                 }
                 OutlinedButton(
                     onClick = onOpenMcpHub,
+                    colors = pillColors,
+                    border = pillBorder,
                     contentPadding = pillPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .testTag("empty_mcp_hub_button"),
                 ) {
-                    Icon(Icons.Outlined.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.Extension,
+                        contentDescription = null,
+                        tint = goldAccent,
+                        modifier = Modifier.size(16.dp),
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "MCP Tools",
@@ -1592,6 +1667,7 @@ private fun EditMessageDialog(
     var draft by remember(message) { mutableStateOf(message.content) }
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = { Text("Edit Message") },
         text = {
             OutlinedTextField(
@@ -1600,6 +1676,7 @@ private fun EditMessageDialog(
                 minLines = 3,
                 maxLines = 8,
                 shape = RoundedCornerShape(12.dp),
+                colors = aetherTextFieldColors(),
                 modifier = Modifier.fillMaxWidth(),
             )
         },

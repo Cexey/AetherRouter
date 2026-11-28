@@ -106,8 +106,8 @@ fun LiveArtifactPreviewOverlay(
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Chrome
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 3.dp,
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
             ) {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     Row(
@@ -194,8 +194,15 @@ fun LiveArtifactPreviewOverlay(
                             FilterChip(
                                 selected = !showSourceMode,
                                 onClick = { showSourceMode = false },
+                                colors = aetherFilterChipColors(),
+                                border = aetherFilterChipBorder(enabled = true, selected = !showSourceMode),
                                 leadingIcon = {
-                                    Icon(Icons.Outlined.Visibility, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Icon(
+                                        imageVector = Icons.Outlined.Visibility,
+                                        contentDescription = null,
+                                        tint = if (!showSourceMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(15.dp),
+                                    )
                                 },
                                 label = { Text("Preview") },
                                 modifier = Modifier.testTag("artifact_tab_preview"),
@@ -203,8 +210,15 @@ fun LiveArtifactPreviewOverlay(
                             FilterChip(
                                 selected = showSourceMode,
                                 onClick = { showSourceMode = true },
+                                colors = aetherFilterChipColors(),
+                                border = aetherFilterChipBorder(enabled = true, selected = showSourceMode),
                                 leadingIcon = {
-                                    Icon(Icons.Outlined.Code, contentDescription = null, modifier = Modifier.size(15.dp))
+                                    Icon(
+                                        imageVector = Icons.Outlined.Code,
+                                        contentDescription = null,
+                                        tint = if (showSourceMode) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(15.dp),
+                                    )
                                 },
                                 label = { Text("View Source") },
                                 modifier = Modifier.testTag("artifact_tab_source"),

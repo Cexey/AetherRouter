@@ -94,7 +94,7 @@ class PreferencesRepository(
         AppPreferences(
             appearance = AppearanceConfig(
                 themeMode = ThemeMode.fromString(prefs[Keys.THEME_MODE]),
-                useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: true,
+                useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: false,
                 customAccentHex = prefs[Keys.CUSTOM_ACCENT_HEX].orEmpty(),
                 userBubbleHex = prefs[Keys.USER_BUBBLE_HEX].orEmpty(),
                 assistantSurfaceHex = prefs[Keys.ASSISTANT_SURFACE_HEX].orEmpty(),
@@ -200,7 +200,7 @@ class PreferencesRepository(
         context.aetherDataStore.edit { prefs ->
             val current = AppearanceConfig(
                 themeMode = ThemeMode.fromString(prefs[Keys.THEME_MODE]),
-                useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: true,
+                useDynamicColor = prefs[Keys.USE_DYNAMIC_COLOR] ?: false,
                 customAccentHex = prefs[Keys.CUSTOM_ACCENT_HEX].orEmpty(),
                 userBubbleHex = prefs[Keys.USER_BUBBLE_HEX].orEmpty(),
                 assistantSurfaceHex = prefs[Keys.ASSISTANT_SURFACE_HEX].orEmpty(),
