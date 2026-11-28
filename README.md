@@ -22,6 +22,53 @@
 
 ---
 
+## 📲 Download & Install
+
+No coding or compiling required — install **AetherRouter** directly on Android (7.0+ / API 24+):
+
+### Option 1: Install & Auto-Update with Obtainium (Recommended)
+Use **[Obtainium](https://github.com/ImranR98/Obtainium)** to download and keep AetherRouter updated straight from GitHub Releases automatically:
+1. Install [Obtainium](https://github.com/ImranR98/Obtainium) on your Android device.
+2. Open Obtainium and tap **Add App**.
+3. Paste this repository's Releases URL:
+   ```text
+   https://github.com/Cexey/AetherRouter/releases
+   ```
+4. Tap **Add**, then **Install** — Obtainium will track and deliver future APK releases automatically.
+
+### Option 2: Direct APK Download
+1. Go to the **[GitHub Releases](https://github.com/Cexey/AetherRouter/releases)** page (latest: **[AetherRouter 9.0](https://github.com/Cexey/AetherRouter/releases/tag/AetherRouter)**).
+2. Download the `.apk` file under **Assets**.
+3. Open the downloaded `.apk` on your Android device (allow *Install unknown apps* if prompted).
+
+### 🔑 First-Time Setup
+1. Launch **AetherRouter** and open **Settings**.
+2. Paste your **[OpenRouter API Key](https://openrouter.ai/keys)**.
+3. *(Optional)* Add an **OpenRouter Management API Key** for 30-day usage analytics and/or a **GitHub Personal Access Token (PAT)** for GitHub Studio.
+
+<details>
+<summary>🛠️ Build from Source (For Developers)</summary>
+
+#### Prerequisites
+- Android Studio (or Gradle CLI) with JDK 17+
+
+#### Build Steps
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Cexey/AetherRouter.git
+   cd AetherRouter
+   ```
+2. Copy `.env.example` if configuring local environment variables.
+3. Build the debug APK:
+   ```bash
+   ./gradlew assembleDebug
+   ```
+4. Install on your Android device (Android 7.0+ / API 24+).
+
+</details>
+
+---
+
 ## 🚀 Key Features
 
 ### 🧠 Core AI Engine & Streaming
@@ -102,29 +149,6 @@ app/src/main/java/com/example/
 | **Media** | Coil (Animated GIFs & Stickers) |
 | **Protocols** | OpenRouter API, MCP (JSON-RPC), GitHub REST API |
 | **SDK Targets** | `minSdk 24` (Android 7.0) → `targetSdk 36` |
-
----
-
-## ⚙️ Getting Started
-
-### Prerequisites
-- Android Studio (or Gradle CLI) with JDK 17+
-- An [OpenRouter API Key](https://openrouter.ai/keys)
-- *(Optional)* OpenRouter Management API Key for 30-day activity analytics
-- *(Optional)* GitHub Personal Access Token (PAT) for GitHub Studio
-
-### Build & Run
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Cexey/AetherRouter.git
-   cd AetherRouter
-   ```
-2. Copy `.env.example` if configuring local environment variables, or enter your API keys directly inside **AetherRouter → Settings** on first launch.
-3. Build the debug APK:
-   ```bash
-   ./gradlew assembleDebug
-   ```
-4. Install on your Android device (Android 7.0+ / API 24+).
 
 ---
 
