@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="./1795878671612.jpg" alt="AetherRouter Banner" width="100%" />
+
 # ⚡ AetherRouter
 
 **A high-craft, customizable OpenRouter API client for Android — built for power users, creative studios, and mobile-first developers.**
