@@ -698,8 +698,13 @@ fun VaultAndPreferencesSheet(
                             border = aetherCardBorder(selected = true),
                             modifier = Modifier.testTag("settings_version_badge"),
                         ) {
+                            val displayVersion = if (BuildConfig.VERSION_NAME.startsWith("v", ignoreCase = true)) {
+                                BuildConfig.VERSION_NAME
+                            } else {
+                                "v${BuildConfig.VERSION_NAME}"
+                            }
                             Text(
-                                text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                                text = "$displayVersion (${BuildConfig.VERSION_CODE})",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,

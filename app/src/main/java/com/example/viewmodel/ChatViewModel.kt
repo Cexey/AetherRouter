@@ -405,13 +405,6 @@ class ChatViewModel(
             vaultRepository.ensureStarterModelsSeeded()
             vaultRepository.ensureStarterPresetsSeeded()
             vaultRepository.pruneEmptyDraftConversations()
-            val existing = vaultRepository.observeConversations().first()
-            if (activeConversationId.value == null) {
-                val resumable = existing.firstOrNull { it.messageCount > 0 } ?: existing.firstOrNull()
-                if (resumable != null) {
-                    activeConversationId.value = resumable.id
-                }
-            }
             val savedKey = preferencesRepository.getDecryptedApiKey()
             if (savedKey.isNotBlank()) {
                 refreshCreditBalance(silent = true)

@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.aetherrouter.vqrmkx"
     minSdk = 24
     targetSdk = 36
-    versionCode = 7
-    versionName = "7.0"
+    versionCode = 2
+    versionName = "v1.0.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
